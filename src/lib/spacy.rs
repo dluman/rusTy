@@ -16,6 +16,19 @@ pub struct nlpstruct {
   object: PyObject,
   container: PyType,
   pub fields: serde_json::value::Value,
+  //pub methods: serde_json::value::Value,
+}
+
+struct call {
+  method: &'static str,
+  args: &'static str,
+  kwargs: &'static str,
+}
+
+trait callable {
+  fn call(&self, func: &'static str);
+  fn args(&self, args: &'static str);
+  fn kwargs(&self, kwargs: &'static str);
 }
 
 // This requires all operations to be colocated?
@@ -68,6 +81,9 @@ impl module {
     // Acquire GIL
     let gil = Python::acquire_gil();
     let python = gil.python();
+    
+    // Fields
+    
     // Unwrap result
     let result = object
       .call_method(python,"to_json",("",),None)
@@ -86,24 +102,40 @@ impl module {
     // IT'S A HACK!
     string = string.replace("'","\"");
     // Convert fields to a JSON structure
-    let json: Value = serde_json::from_str(&string)
+    let fields: Value = serde_json::from_str(&string)
       .unwrap();
+      
+    
+    // Methods
+    let cmd = format!("dir({:?})",object.repr(python).unwrap().to_string(python).unwrap());
+    let methods = python.run(&cmd,None,None);
+    println!("{:?}",methods);
+    
+    
     // Return the struct
     nlpstruct{
       object: object,
       container: obj_type, 
-      fields: json,
+      fields: fields,
+      //methods: methods.unwrap(),
     }
   }
 }
 
-impl nlpstruct {
+impl callable for nlpstruct {
 
-  pub fn eval(&self) {
+  fn call(&self, func: &'static str) {
     // Acquire GIL
     let gil = Python::acquire_gil();
     let python = gil.python();
-    println!("{:#?}",self.container.name(python));
+    
+  }
+  
+  fn args(&self, args: &'static str) {
+  
+  }
+  
+  fn kwargs(&self, kwargs: &'static str) {
   }
 }
 
