@@ -13,6 +13,7 @@ pub struct module {
 }
 
 pub struct nlpstruct {
+  object: PyObject,
   container: PyType,
   pub fields: serde_json::value::Value,
 }
@@ -51,17 +52,18 @@ impl module {
     }
     
   pub fn nlp(self, text: &'static str) 
-    -> PyObject {
+    -> nlpstruct {
       // Acquire GIL
       let gil = Python::acquire_gil();
       let python = gil.python();
-      // Unwrap result
-      (self.model)
-        .call(python, (text,), None)
-        .unwrap()
+      self::module::map(
+        (self.model)
+          .call(python, (text,), None)
+          .unwrap()
+      )
   }
   
-  pub fn map(object: PyObject) 
+  fn map(object: PyObject) 
     -> nlpstruct {
     // Acquire GIL
     let gil = Python::acquire_gil();
@@ -86,10 +88,22 @@ impl module {
     // Convert fields to a JSON structure
     let json: Value = serde_json::from_str(&string)
       .unwrap();
+    // Return the struct
     nlpstruct{
+      object: object,
       container: obj_type, 
       fields: json,
     }
+  }
+}
+
+impl nlpstruct {
+
+  pub fn eval(&self) {
+    // Acquire GIL
+    let gil = Python::acquire_gil();
+    let python = gil.python();
+    println!("{:#?}",self.container.name(python));
   }
 }
 
