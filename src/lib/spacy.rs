@@ -3,7 +3,6 @@
 use cpython::*;
 use lazy_static::lazy_static;
 use std::default::Default;
-use std::borrow::Borrow;
 use std::sync::Mutex;
 use serde::{Serialize, Deserialize};
 use serde_json::*; 
@@ -11,6 +10,11 @@ use serde_json::*;
 #[derive(Debug)]
 pub struct module {
   model: PyObject
+}
+
+pub struct nlpstruct {
+  container: PyType,
+  pub fields: serde_json::value::Value,
 }
 
 // This requires all operations to be colocated?
@@ -57,13 +61,18 @@ impl module {
         .unwrap()
   }
   
-  pub fn map(object: PyObject) {
+  pub fn map(object: PyObject) 
+    -> nlpstruct {
     // Acquire GIL
     let gil = Python::acquire_gil();
     let python = gil.python();
+    // Unwrap result
     let result = object
       .call_method(python,"to_json",("",),None)
       .unwrap();
+    // Get the type
+    let obj_type: PyType = object.get_type(python);
+    // Convert PyString to a regular String
     let py_string = result
       .str(python)
       .unwrap();
@@ -72,12 +81,19 @@ impl module {
         .to_string(python)
         .unwrap()
     );
+    // IT'S A HACK!
     string = string.replace("'","\"");
+    // Convert fields to a JSON structure
     let json: Value = serde_json::from_str(&string)
       .unwrap();
-    println!("{:?}",json);
+    nlpstruct{
+      container: obj_type, 
+      fields: json,
+    }
   }
 }
+
+// I use this to determine types and figure out what to do next.
 
 /*pub fn eval(object: PyObject) {
     // Acquire GIL
