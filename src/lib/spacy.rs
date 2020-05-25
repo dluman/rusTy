@@ -19,16 +19,18 @@ pub struct nlpstruct {
   //pub methods: serde_json::value::Value,
 }
 
-struct call {
+#[derive(Debug)]
+pub struct call {
   method: &'static str,
   args: &'static str,
   kwargs: &'static str,
 }
 
-trait callable {
-  fn call(&self, func: &'static str);
+pub trait callable {
+  fn call(&self, func: &'static str) -> call;
   fn args(&self, args: &'static str);
   fn kwargs(&self, kwargs: &'static str);
+  fn invoke(&self);
 }
 
 // This requires all operations to be colocated?
@@ -43,6 +45,54 @@ lazy_static! {
       .unwrap();
     Mutex::new(spacy)
   };
+}
+
+impl callable for nlpstruct {
+
+  // Some quasi-builder monstrosity
+
+  fn call(&self, func: &'static str)
+    -> call {
+      // Acquire GIL
+      let gil = Python::acquire_gil();
+      let python = gil.python();
+      call{
+        method: func,
+        args: "",
+        kwargs: "",
+      }
+    }
+  
+  fn args(&self, args: &'static str) {
+    
+  }
+  
+  fn kwargs(&self, kwargs: &'static str) {
+  }
+  
+  fn invoke(&self) 
+    {//-> PyObject {
+      // Acquire GIL
+      let gil = Python::acquire_gil();
+      let python = gil.python();
+      
+      println!("{}",self.object.is_callable(python));
+    }
+}
+
+impl call {
+  
+  pub fn args(mut self, args: &'static str)
+    -> Self {
+      self.args = args;
+      self
+    }
+  
+  pub fn kwargs(mut self, kwargs: &'static str) 
+    -> Self {
+      self.kwargs = kwargs;
+      self
+    }
 }
 
 impl module {
@@ -104,13 +154,6 @@ impl module {
     // Convert fields to a JSON structure
     let fields: Value = serde_json::from_str(&string)
       .unwrap();
-      
-    
-    // Methods
-    let cmd = format!("dir({:?})",object.repr(python).unwrap().to_string(python).unwrap());
-    let methods = python.run(&cmd,None,None);
-    println!("{:?}",methods);
-    
     
     // Return the struct
     nlpstruct{
@@ -122,26 +165,9 @@ impl module {
   }
 }
 
-impl callable for nlpstruct {
-
-  fn call(&self, func: &'static str) {
-    // Acquire GIL
-    let gil = Python::acquire_gil();
-    let python = gil.python();
-    
-  }
-  
-  fn args(&self, args: &'static str) {
-  
-  }
-  
-  fn kwargs(&self, kwargs: &'static str) {
-  }
-}
-
 // I use this to determine types and figure out what to do next.
 
-/*pub fn eval(object: PyObject) {
+pub fn eval(object: PyObject) {
     // Acquire GIL
     let gil = Python::acquire_gil();
     let python = gil.python();
@@ -151,4 +177,4 @@ impl callable for nlpstruct {
     println!("{:#?}",object.as_ptr());
     println!("{:#?}",obj_type.name(python));
     println!("{:#?}",obj_repr.unwrap().to_string(python).unwrap());
-}*/
+}
