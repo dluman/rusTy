@@ -1,6 +1,4 @@
 use cpython::*;
-use serde::{Serialize, Deserialize};
-use serde_json::*; 
 
 pub fn map(object: PyObject) 
   -> serde_json::value::Value {
@@ -16,8 +14,8 @@ pub fn map(object: PyObject)
       .unwrap();
       
     // Get the type
-    let obj_type: PyType = object
-      .get_type(python);
+    //let obj_type: PyType = object
+      //.get_type(python);
     
     // Convert PyString to a regular String
     let py_string = result

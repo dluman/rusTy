@@ -2,8 +2,6 @@
 
 use cpython::*;
 use lazy_static::lazy_static;
-use serde::{Serialize, Deserialize};
-use serde_json::*; 
 use std::sync::Mutex;
 
 #[derive(Debug)]
@@ -42,7 +40,7 @@ impl Module {
       }
     }
   
-  pub fn load(mut self, model: &'static str)
+  pub fn load(self, model: &'static str)
     -> Self {
       // Load module
       let spacy = SPACY
@@ -67,6 +65,8 @@ impl Module {
       self
     }
 }
+
+// FREE RANGE FUNCTIONS
 
 pub fn nlp(text: &'static str)
   -> doc::Doc {
