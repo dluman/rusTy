@@ -12,12 +12,12 @@ pub struct Doc {
 
 impl Doc {
 
-  pub fn new(object: PyObject)
+  pub fn new(python: Python, object: PyObject)
     -> Self {
-      // Need to reconcile move
-      let fields = types::map(object);
+      let obj = object.clone_ref(python);
+      let fields = types::map(obj);
       Doc {
-        object: None,
+        object: Some(object),
         fields: fields,
       }
     }
