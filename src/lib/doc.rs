@@ -9,13 +9,14 @@ pub struct Doc {
   pub fields: serde_json::value::Value,
 }
 
-trait Callable {
-  fn call(self, method: &'static str) -> dispatch::Call;
+pub trait Callable<T> {
+  fn new(python: Python, object: PyObject) -> Doc;
+  fn call(self, method: &'static str) -> dispatch::Call<T>;
 }
 
 impl Doc {
 
-  pub fn new(python: Python, object: PyObject)
+  /*pub fn new(python: Python, object: PyObject)
     -> Self {
       let obj = object.clone_ref(python);
       let fields = types::map(obj);
@@ -23,27 +24,37 @@ impl Doc {
         object: Some(object),
         fields: fields,
       }
-    }
+    }*/
 }
 
-impl Callable for Doc {
+impl<T> Callable<T> for Doc {
+
+  fn new(python: Python, object: PyObject)
+    -> Doc {
+      let obj = object.clone_ref(python);
+      let fields = types::map(obj);
+      Doc {
+        object: Some(object),
+        fields: fields,
+      }
+    }
   
   fn call(self, method: &'static str)
-    -> dispatch::Call {
-      dispatch::Call{
+    -> dispatch::Call<T> {
+      dispatch::Call::<T>{
         object: self.object,
         method: method,
-        args: "",
+        args: None,
         kwargs: "",
       }
     }
 }
 
-impl dispatch::Call {
+impl<T> dispatch::Call<T> {
   
-  pub fn args(mut self, args: &'static str)
+  pub fn args(mut self, args: T)
     -> Self {
-      self.args = args;
+      self.args = Some(args);
       self
     }
   
@@ -58,5 +69,6 @@ impl dispatch::Call {
       // Acquire GIL
       let gil = Python::acquire_gil();
       let python = gil.python();
+      println!("{:?}",self.method);
     }
 }
