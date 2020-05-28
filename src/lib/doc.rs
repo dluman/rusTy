@@ -1,7 +1,7 @@
 #[path = "dispatch.rs"] mod dispatch;
 #[path = "types.rs"] mod types;
 
-use cpython::*; 
+use cpython::*;
 
 #[derive(Debug)]
 pub struct Doc {
@@ -10,13 +10,12 @@ pub struct Doc {
 }
 
 pub trait Callable<T> {
-  fn new(python: Python, object: PyObject) -> Doc;
   fn call(self, method: &'static str) -> dispatch::Call<T>;
 }
 
 impl Doc {
 
-  /*pub fn new(python: Python, object: PyObject)
+  pub fn new(python: Python, object: PyObject)
     -> Self {
       let obj = object.clone_ref(python);
       let fields = types::map(obj);
@@ -24,24 +23,14 @@ impl Doc {
         object: Some(object),
         fields: fields,
       }
-    }*/
+    }
 }
 
 impl<T> Callable<T> for Doc {
-
-  fn new(python: Python, object: PyObject)
-    -> Doc {
-      let obj = object.clone_ref(python);
-      let fields = types::map(obj);
-      Doc {
-        object: Some(object),
-        fields: fields,
-      }
-    }
   
   fn call(self, method: &'static str)
     -> dispatch::Call<T> {
-      dispatch::Call::<T>{
+      dispatch::Call::<T> {
         object: self.object,
         method: method,
         args: None,
@@ -50,7 +39,10 @@ impl<T> Callable<T> for Doc {
     }
 }
 
-impl<T> dispatch::Call<T> {
+impl ToPyObject for Doc {
+}
+
+impl<T: ToPyObject> dispatch::Call<T> where T: Callable<PyObject> {
   
   pub fn args(mut self, args: T)
     -> Self {
@@ -69,6 +61,14 @@ impl<T> dispatch::Call<T> {
       // Acquire GIL
       let gil = Python::acquire_gil();
       let python = gil.python();
-      println!("{:?}",self.method);
+      let args = (self.args.unwrap()).to_py_object(python);
+      let result = (self.object.unwrap())
+        .call_method(
+          python,
+          self.method,
+          (args,),
+          None
+        ).unwrap();
+      println!("{}",self.method);
     }
 }

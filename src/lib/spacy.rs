@@ -1,4 +1,4 @@
-#[path = "doc.rs"] mod doc;
+#[path = "doc.rs"] pub mod doc;
 
 use cpython::*;
 use lazy_static::lazy_static;
@@ -85,6 +85,6 @@ pub fn nlp(text: &'static str)
         (text,),
         None
       ).unwrap();
-    let doc: doc::Doc = doc::Callable::new(python, result);
+    let doc = doc::Doc::new(python, result);
     doc
   }
