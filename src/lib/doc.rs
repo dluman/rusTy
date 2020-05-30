@@ -26,6 +26,20 @@ impl Doc {
     }
 }
 
+impl ToPyObject for Doc {
+
+  type ObjectType = PyObject;
+  
+  fn to_py_object(&self, python: Python)
+    -> PyObject {
+      let doc = match Some((self.object).as_ref().unwrap()) {
+        val => val.to_py_object(python).into_object(),
+        None => python.None(),
+      };
+      doc.clone_ref(python)
+    }
+}
+
 impl<T> Callable<T> for Doc {
   
   fn call(self, method: &'static str)
@@ -37,9 +51,6 @@ impl<T> Callable<T> for Doc {
         kwargs: "",
       }
     }
-}
-
-impl ToPyObject for Doc {
 }
 
 impl<T: ToPyObject> dispatch::Call<T> where T: Callable<PyObject> {
@@ -61,7 +72,7 @@ impl<T: ToPyObject> dispatch::Call<T> where T: Callable<PyObject> {
       // Acquire GIL
       let gil = Python::acquire_gil();
       let python = gil.python();
-      let args = (self.args.unwrap()).to_py_object(python);
+      let args = ((self.args).unwrap()).to_py_object(python);
       let result = (self.object.unwrap())
         .call_method(
           python,
@@ -69,6 +80,6 @@ impl<T: ToPyObject> dispatch::Call<T> where T: Callable<PyObject> {
           (args,),
           None
         ).unwrap();
-      println!("{}",self.method);
+      println!("{:?}",result);
     }
 }
