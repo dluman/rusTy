@@ -10,6 +10,6 @@ fn main() {
   pangram1
     .call("similarity")
     .args(pangram2)
-    .kwargs("")
+    .kwargs(None)
     .invoke();
 }

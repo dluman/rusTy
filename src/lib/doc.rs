@@ -33,8 +33,7 @@ impl ToPyObject for Doc {
   fn to_py_object(&self, python: Python)
     -> PyObject {
       let doc = match Some((self.object).as_ref().unwrap()) {
-        val => val.to_py_object(python).into_object(),
-        None => python.None(),
+        val => val.to_py_object(python).into_object()
       };
       doc.clone_ref(python)
     }
@@ -61,9 +60,9 @@ impl<T: ToPyObject> dispatch::Call<T> where T: Callable<PyObject> {
       self
     }
   
-  pub fn kwargs(mut self, kwargs: &'static str)
+  pub fn kwargs(mut self, kwargs: Option<&'static str>)
     -> Self {
-      self.kwargs = kwargs;
+      self.kwargs = kwargs.unwrap_or("");
       self
     }
     
