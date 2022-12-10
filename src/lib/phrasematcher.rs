@@ -3,7 +3,7 @@ pub mod spacy;
 
 use cpython::*;
 
-use crate::phrasematcher::spacy::Module;
+use spacy::Module;
 
 pub fn match_phrases() {
     let gil: GILGuard = Python::acquire_gil();
