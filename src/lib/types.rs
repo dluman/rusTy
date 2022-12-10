@@ -10,10 +10,6 @@ pub fn map(object: PyObject) -> serde_json::value::Value {
     // Unwrap result
     let result = object.call_method(python, "to_json", ("",), None).unwrap();
 
-    // Get the type
-    //let obj_type: PyType = object
-    //.get_type(python);
-
     // Convert PyString to a regular String
     let py_string = result.str(python).unwrap();
     let mut string = String::from(py_string.to_string(python).unwrap());
