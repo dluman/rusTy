@@ -1,7 +1,8 @@
-#[path = "dispatch.rs"]
-mod dispatch;
 #[path = "types.rs"]
-mod types;
+pub mod types;
+
+#[path = "dispatch.rs"]
+pub mod dispatch;
 
 use cpython::*;
 
@@ -63,14 +64,16 @@ where
     }
 
     pub fn invoke(self) {
-        //-> PyObject {
-        // Acquire GIL
-        let gil = Python::acquire_gil();
-        let python = gil.python();
-        let args = ((self.args).unwrap()).to_py_object(python);
-        let result = (self.object.unwrap())
-            .call_method(python, self.method, (args,), None)
-            .unwrap();
+        let gil: GILGuard = Python::acquire_gil();
+        let python: Python = gil.python();
+        let args: <T as ToPyObject>::ObjectType = ((self.args).unwrap()).to_py_object(python);
+
+        let result: PyObject = {
+            (self.object.unwrap())
+                .call_method(python, self.method, (args,), None)
+                .unwrap()
+        };
+        // let x = result.to_string().as_str();
         println!("{:?}", result);
     }
 }
