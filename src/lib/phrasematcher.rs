@@ -4,6 +4,7 @@ pub mod spacy;
 use cpython::*;
 
 use spacy::Module;
+use std::collections::HashMap;
 
 pub fn match_phrases() {
     let gil: GILGuard = Python::acquire_gil();
@@ -25,6 +26,10 @@ pub fn match_phrases() {
         .call_method(python, "add", ("FOOD", patterns), None)
         .unwrap();
 
-    let matches: PyObject = matcher.call(python, (text,), None).unwrap();
+    let mut kwargs = HashMap::new();
+    kwargs.insert("as_spans".to_string(), true);
+    let py_kwargs = kwargs.to_py_object(python);
+
+    let matches: PyObject = matcher.call(python, (text,), Some(&py_kwargs)).unwrap();
     println!("{}", matches);
 }
