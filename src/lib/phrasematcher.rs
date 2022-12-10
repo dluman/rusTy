@@ -23,7 +23,7 @@ pub fn match_phrases() {
     let phrases_to_match: PyList = vec!["United Kingdom", "United States"].to_py_object(python);
     let patterns: PyObject = spacy::tokenizer(phrases_to_match);
     matcher
-        .call_method(python, "add", ("FOOD", patterns), None)
+        .call_method(python, "add", ("COUNTRY", patterns), None)
         .unwrap();
 
     let mut kwargs = HashMap::new();
