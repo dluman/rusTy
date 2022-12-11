@@ -1,6 +1,6 @@
-use cpython::*;
-
 use crate::utils::{dispatch, types};
+
+use cpython::*;
 
 #[derive(Debug)]
 pub struct Doc {
