@@ -1,10 +1,6 @@
-#[path = "types.rs"]
-pub mod types;
-
-#[path = "dispatch.rs"]
-pub mod dispatch;
-
 use cpython::*;
+
+use crate::lib::{dispatch, types};
 
 #[derive(Debug)]
 pub struct Doc {
@@ -24,6 +20,18 @@ impl Doc {
             object: Some(object),
             fields: fields,
         }
+    }
+
+    pub fn similarity(&self, doc: Doc) -> PyObject {
+        let gil: GILGuard = Python::acquire_gil();
+        let python: Python = gil.python();
+
+        let sim = self
+            .to_py_object(python)
+            .call_method(python, "similarity", (doc,), None)
+            .unwrap();
+
+        sim
     }
 }
 
@@ -49,31 +57,31 @@ impl<T> Callable<T> for Doc {
     }
 }
 
-impl<T: ToPyObject> dispatch::Call<T>
-where
-    T: Callable<PyObject>,
-{
-    pub fn args(mut self, args: T) -> Self {
-        self.args = Some(args);
-        self
-    }
+// impl<T: ToPyObject> dispatch::Call<T>
+// where
+//     T: Callable<PyObject>,
+// {
+//     pub fn args(mut self, args: T) -> Self {
+//         self.args = Some(args);
+//         self
+//     }
 
-    pub fn kwargs(mut self, kwargs: Option<&'static str>) -> Self {
-        self.kwargs = kwargs.unwrap_or("");
-        self
-    }
+//     pub fn kwargs(mut self, kwargs: Option<&'static str>) -> Self {
+//         self.kwargs = kwargs.unwrap_or("");
+//         self
+//     }
 
-    pub fn invoke(self) {
-        let gil: GILGuard = Python::acquire_gil();
-        let python: Python = gil.python();
-        let args: <T as ToPyObject>::ObjectType = ((self.args).unwrap()).to_py_object(python);
+//     pub fn invoke(self) {
+//         let gil: GILGuard = Python::acquire_gil();
+//         let python: Python = gil.python();
+//         let args: <T as ToPyObject>::ObjectType = ((self.args).unwrap()).to_py_object(python);
 
-        let result: PyObject = {
-            (self.object.unwrap())
-                .call_method(python, self.method, (args,), None)
-                .unwrap()
-        };
-        // let x = result.to_string().as_str();
-        println!("{:?}", result);
-    }
-}
+//         let result: PyObject = {
+//             (self.object.unwrap())
+//                 .call_method(python, self.method, (args,), None)
+//                 .unwrap()
+//         };
+//         // let x = result.to_string().as_str();
+//         println!("{:?}", result);
+//     }
+// }

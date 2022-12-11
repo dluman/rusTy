@@ -1,6 +1,4 @@
-#[path = "doc.rs"]
-pub mod doc;
-
+use crate::lib::doc;
 use cpython::*;
 
 use lazy_static::lazy_static;

@@ -1,23 +1,15 @@
-#[path = "lib/phrasematcher.rs"]
-mod phrasematcher;
-#[path = "lib/spacy.rs"]
-mod spacy;
-
-#[path = "lib/doc.rs"]
-mod doc;
-
-use crate::spacy::doc::Callable;
+use crate::lib::{phrasematcher, spacy};
+pub mod lib;
+// pub mod lib;
 
 fn main() {
     let spacy = spacy::Module::init();
     spacy.load("en_core_web_sm");
     let pangram1 = spacy::nlp("This is good.");
     let pangram2 = spacy::nlp("This is bad.");
-    pangram1
-        .call("similarity")
-        .args(pangram2)
-        .kwargs(None)
-        .invoke();
+
+    let sim = pangram1.similarity(pangram2);
+    println!("{:?}", sim);
 
     phrasematcher::match_phrases();
 }
