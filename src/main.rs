@@ -1,6 +1,6 @@
-use crate::lib::{doc, phrasematcher, spacy};
-pub mod lib;
-// pub mod lib;
+pub mod utils;
+
+use crate::utils::{doc, phrasematcher, spacy};
 
 use cpython::*;
 

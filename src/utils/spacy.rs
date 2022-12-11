@@ -1,4 +1,4 @@
-use crate::lib::doc;
+use crate::utils::doc;
 use cpython::*;
 
 use lazy_static::lazy_static;

@@ -1,4 +1,4 @@
-use crate::lib::{doc, spacy};
+use crate::utils::{doc, spacy};
 
 use cpython::*;
 use spacy::*;
@@ -25,9 +25,9 @@ pub fn match_phrases() {
         .call_method(python, "add", ("COUNTRY", patterns), None)
         .unwrap();
 
-    let mut kwargs = HashMap::new();
+    let mut kwargs: HashMap<String, bool> = HashMap::new();
     kwargs.insert("as_spans".to_string(), true);
-    let py_kwargs = kwargs.to_py_object(python);
+    let py_kwargs: PyDict = kwargs.to_py_object(python);
 
     let matches: PyObject = matcher.call(python, (&text,), Some(&py_kwargs)).unwrap();
     println!("{}", matches);
