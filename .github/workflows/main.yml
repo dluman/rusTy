@@ -1,16 +1,37 @@
-on: [push]
+name: CI
 
-name: cargo build
+on: [push, pull_request]
 
 jobs:
-  build:
-    name: rusTy
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          toolchain: stable
-      - uses: actions-rs/cargo@v1
+          python-version: '3.11'
+
+      - name: Install spaCy and model
+        run: |
+          pip install spacy click
+          python -m spacy download en_core_web_sm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          command: build
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Build
+        run: cargo build
+
+      - name: Run tests
+        run: cargo test

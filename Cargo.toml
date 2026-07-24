@@ -2,14 +2,13 @@
 name = "spacy_rs"
 version = "0.1.0"
 authors = ["Douglas Luman <dluman@douglasjluman.com>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2021"
 
 [dependencies]
-cpython = "0.5"
-libc = "0.2"
-lazy_static = "1.4.0"
-libloading = "0.5"
-serde = { version = "1.0.104", features = ["derive"] }
-serde_json = "1.0.48"
+pyo3 = { version = "0.21", features = ["abi3-py38", "auto-initialize"] }
+numpy = "0.21"
+thiserror = "1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
