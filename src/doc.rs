@@ -36,6 +36,10 @@ impl Doc {
         })
     }
 
+    pub fn is_empty(&self) -> Result<bool, SpaCyError> {
+        Ok(self.len()? == 0)
+    }
+
     pub fn token(&self, i: usize) -> Result<Token, SpaCyError> {
         with_gil(|py| {
             let obj = self.obj.bind(py);

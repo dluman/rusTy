@@ -7,7 +7,7 @@ pub fn with_gil<T, F>(f: F) -> Result<T, SpaCyError>
 where
     F: FnOnce(Python<'_>) -> Result<T, SpaCyError>,
 {
-    Python::with_gil(|py| f(py))
+    Python::with_gil(f)
 }
 
 /// Extract a Vec<f32> from a spaCy vector (numpy array) via rust-numpy.
