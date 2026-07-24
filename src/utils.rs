@@ -1,5 +1,5 @@
 use pyo3::{prelude::*, types::PyDict};
-use numpy::PyArray1;
+use numpy::{PyArray1, PyArrayMethods};
 use crate::error::SpaCyError;
 
 /// Acquire the GIL and run a closure, converting PyErr to SpaCyError.
@@ -15,7 +15,8 @@ pub fn extract_vec_f32(obj: &Bound<'_, PyAny>) -> Result<Vec<f32>, SpaCyError> {
     // spaCy vectors are numpy arrays; try to downcast to PyArray1<f32>
     let array = obj.downcast::<PyArray1<f32>>()
         .map_err(|e| SpaCyError::Numpy(format!("Failed to downcast to PyArray1<f32>: {}", e)))?;
-    let vec = array.to_vec()?;
+    let vec = array.to_vec()
+        .map_err(|e| SpaCyError::Numpy(format!("Failed to convert numpy array to vec: {}", e)))?;
     Ok(vec)
 }
 
@@ -23,10 +24,10 @@ pub fn extract_vec_f32(obj: &Bound<'_, PyAny>) -> Result<Vec<f32>, SpaCyError> {
 pub fn kwargs_from_json<'a>(
     py: Python<'a>,
     json: Option<&str>,
-) -> Result<Option<&'a PyDict>, SpaCyError> {
+) -> Result<Option<Bound<'a, PyDict>>, SpaCyError> {
     match json {
         Some(s) => {
-            let dict: &PyDict = py.import("json")?
+            let dict: Bound<'a, PyDict> = py.import_bound("json")?
                 .getattr("loads")?
                 .call1((s,))?
                 .extract()?;

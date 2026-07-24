@@ -30,8 +30,8 @@ impl From<pyo3::PyErr> for SpaCyError {
     }
 }
 
-impl From<numpy::IntoVecError> for SpaCyError {
-    fn from(err: numpy::IntoVecError) -> Self {
+impl From<numpy::FromVecError> for SpaCyError {
+    fn from(err: numpy::FromVecError) -> Self {
         SpaCyError::Numpy(err.to_string())
     }
 }
