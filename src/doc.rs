@@ -126,7 +126,12 @@ impl Doc {
     pub fn to_json(&self) -> Result<Value, SpaCyError> {
         with_gil(|py| {
             let obj = self.obj.bind(py);
-            let json_str = obj.call_method0("to_json")?;
+            let json_dict = obj.call_method0("to_json")?;
+            // spaCy returns a Python dict; convert it to a JSON string via json.dumps
+            let json_str = py
+                .import_bound("json")?
+                .getattr("dumps")?
+                .call1((json_dict,))?;
             let json_str: String = json_str.extract()?;
             let value = serde_json::from_str(&json_str)?;
             Ok(value)

@@ -184,7 +184,8 @@ fn test_span_as_doc() {
     let sents = doc.sents().unwrap();
     let sent = &sents[0];
     let sent_doc = sent.as_doc().unwrap();
-    assert_eq!(sent_doc.text().unwrap(), "Apple is great.");
+    // spaCy may include trailing whitespace in sentence spans
+    assert_eq!(sent_doc.text().unwrap().trim(), "Apple is great.");
 }
 
 #[test]
