@@ -16,7 +16,7 @@ jobs:
 
       - name: Install spaCy and model
         run: |
-          pip install spacy
+          pip install spacy click
           python -m spacy download en_core_web_sm
 
       - name: Install Rust toolchain
