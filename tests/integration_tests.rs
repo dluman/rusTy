@@ -47,7 +47,10 @@ fn test_token_booleans() {
     let tokens = doc.tokens().unwrap();
 
     // Find tokens by text rather than hardcoding indices
-    let hello = tokens.iter().find(|t| t.text().unwrap() == "Hello").unwrap();
+    let hello = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Hello")
+        .unwrap();
     let num42 = tokens.iter().find(|t| t.text().unwrap() == "42").unwrap();
 
     assert!(hello.is_alpha().unwrap());
@@ -58,9 +61,7 @@ fn test_token_booleans() {
 #[test]
 fn test_doc_entities() {
     let nlp = get_nlp();
-    let doc = nlp
-        .nlp("Apple is looking at buying a startup.")
-        .unwrap();
+    let doc = nlp.nlp("Apple is looking at buying a startup.").unwrap();
     let ents = doc.ents().unwrap();
 
     assert!(!ents.is_empty());
