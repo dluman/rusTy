@@ -1,6 +1,6 @@
+use crate::utils::{extract_vec_f32, with_gil};
+use crate::{Language, SpaCyError, Span, Token};
 use pyo3::prelude::*;
-use crate::{SpaCyError, Token, Span, Language};
-use crate::utils::{with_gil, extract_vec_f32};
 use serde_json::Value;
 
 #[derive(Debug, Clone)]

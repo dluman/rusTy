@@ -1,5 +1,5 @@
+use crate::{utils::with_gil, SpaCyError};
 use pyo3::prelude::*;
-use crate::{SpaCyError, utils::with_gil};
 
 #[derive(Debug, Clone)]
 pub struct Vocab {
@@ -15,7 +15,9 @@ impl Vocab {
         with_gil(|py| {
             let obj = self.obj.bind(py);
             let strings = obj.getattr("strings")?;
-            Ok(StringStore { obj: strings.into() })
+            Ok(StringStore {
+                obj: strings.into(),
+            })
         })
     }
 }

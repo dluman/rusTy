@@ -1,8 +1,9 @@
 use spacy_rs::Language;
 
 fn get_nlp() -> Language {
-    Language::load("en_core_web_sm")
-        .expect("Failed to load en_core_web_sm. Install it with: python -m spacy download en_core_web_sm")
+    Language::load("en_core_web_sm").expect(
+        "Failed to load en_core_web_sm. Install it with: python -m spacy download en_core_web_sm",
+    )
 }
 
 #[test]
@@ -23,7 +24,7 @@ fn test_doc_tokens() {
     let doc = nlp.nlp("Hello, world!").unwrap();
     let tokens = doc.tokens().unwrap();
     assert!(!tokens.is_empty());
-    
+
     let first = &tokens[0];
     assert_eq!(first.text().unwrap(), "Hello");
     assert_eq!(first.lemma_().unwrap(), "hello");
@@ -41,19 +42,21 @@ fn test_doc_token_by_index() {
 #[test]
 fn test_token_booleans() {
     let nlp = get_nlp();
-    let doc = nlp.nlp("Hello 42 http://example.com test@example.com").unwrap();
+    let doc = nlp
+        .nlp("Hello 42 http://example.com test@example.com")
+        .unwrap();
     let tokens = doc.tokens().unwrap();
-    
+
     // Hello
     assert!(tokens[0].is_alpha().unwrap());
     assert!(!tokens[0].is_digit().unwrap());
-    
+
     // 42
     assert!(tokens[1].like_num().unwrap());
-    
+
     // URL
     assert!(tokens[2].like_url().unwrap());
-    
+
     // Email
     assert!(tokens[3].like_email().unwrap());
 }
@@ -61,9 +64,11 @@ fn test_token_booleans() {
 #[test]
 fn test_doc_entities() {
     let nlp = get_nlp();
-    let doc = nlp.nlp("Apple is looking at buying U.K. startup for $1 billion.").unwrap();
+    let doc = nlp
+        .nlp("Apple is looking at buying U.K. startup for $1 billion.")
+        .unwrap();
     let ents = doc.ents().unwrap();
-    
+
     assert!(!ents.is_empty());
     let first_ent = &ents[0];
     assert_eq!(first_ent.text().unwrap(), "Apple");

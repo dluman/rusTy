@@ -1,6 +1,6 @@
+use crate::utils::{extract_vec_f32, with_gil};
+use crate::{Doc, SpaCyError, Span};
 use pyo3::prelude::*;
-use crate::{SpaCyError, Span, Doc};
-use crate::utils::{with_gil, extract_vec_f32};
 
 #[derive(Debug, Clone)]
 pub struct Token {
@@ -36,19 +36,41 @@ impl Token {
     }
 
     // Text & morphology
-    pub fn text(&self) -> Result<String, SpaCyError> { self.get_attr("text") }
-    pub fn orth_(&self) -> Result<String, SpaCyError> { self.get_attr("orth_") }
-    pub fn lemma_(&self) -> Result<String, SpaCyError> { self.get_attr("lemma_") }
-    pub fn norm_(&self) -> Result<String, SpaCyError> { self.get_attr("norm_") }
-    pub fn lower_(&self) -> Result<String, SpaCyError> { self.get_attr("lower_") }
-    pub fn shape_(&self) -> Result<String, SpaCyError> { self.get_attr("shape_") }
-    pub fn prefix_(&self) -> Result<String, SpaCyError> { self.get_attr("prefix_") }
-    pub fn suffix_(&self) -> Result<String, SpaCyError> { self.get_attr("suffix_") }
+    pub fn text(&self) -> Result<String, SpaCyError> {
+        self.get_attr("text")
+    }
+    pub fn orth_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("orth_")
+    }
+    pub fn lemma_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("lemma_")
+    }
+    pub fn norm_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("norm_")
+    }
+    pub fn lower_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("lower_")
+    }
+    pub fn shape_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("shape_")
+    }
+    pub fn prefix_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("prefix_")
+    }
+    pub fn suffix_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("suffix_")
+    }
 
     // POS & Dependencies
-    pub fn pos_(&self) -> Result<String, SpaCyError> { self.get_attr("pos_") }
-    pub fn tag_(&self) -> Result<String, SpaCyError> { self.get_attr("tag_") }
-    pub fn dep_(&self) -> Result<String, SpaCyError> { self.get_attr("dep_") }
+    pub fn pos_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("pos_")
+    }
+    pub fn tag_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("tag_")
+    }
+    pub fn dep_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("dep_")
+    }
 
     pub fn head(&self) -> Result<Token, SpaCyError> {
         with_gil(|py| {
@@ -58,11 +80,21 @@ impl Token {
         })
     }
 
-    pub fn children(&self) -> Result<Vec<Token>, SpaCyError> { self.get_tokens("children") }
-    pub fn lefts(&self) -> Result<Vec<Token>, SpaCyError> { self.get_tokens("lefts") }
-    pub fn rights(&self) -> Result<Vec<Token>, SpaCyError> { self.get_tokens("rights") }
-    pub fn ancestors(&self) -> Result<Vec<Token>, SpaCyError> { self.get_tokens("ancestors") }
-    pub fn subtree(&self) -> Result<Vec<Token>, SpaCyError> { self.get_tokens("subtree") }
+    pub fn children(&self) -> Result<Vec<Token>, SpaCyError> {
+        self.get_tokens("children")
+    }
+    pub fn lefts(&self) -> Result<Vec<Token>, SpaCyError> {
+        self.get_tokens("lefts")
+    }
+    pub fn rights(&self) -> Result<Vec<Token>, SpaCyError> {
+        self.get_tokens("rights")
+    }
+    pub fn ancestors(&self) -> Result<Vec<Token>, SpaCyError> {
+        self.get_tokens("ancestors")
+    }
+    pub fn subtree(&self) -> Result<Vec<Token>, SpaCyError> {
+        self.get_tokens("subtree")
+    }
 
     pub fn nbor(&self, offset: i64) -> Result<Token, SpaCyError> {
         with_gil(|py| {
@@ -73,23 +105,53 @@ impl Token {
     }
 
     // Entities
-    pub fn ent_type_(&self) -> Result<String, SpaCyError> { self.get_attr("ent_type_") }
-    pub fn ent_iob_(&self) -> Result<String, SpaCyError> { self.get_attr("ent_iob_") }
-    pub fn ent_kb_id_(&self) -> Result<String, SpaCyError> { self.get_attr("ent_kb_id_") }
+    pub fn ent_type_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("ent_type_")
+    }
+    pub fn ent_iob_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("ent_iob_")
+    }
+    pub fn ent_kb_id_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("ent_kb_id_")
+    }
 
     // Booleans
-    pub fn is_alpha(&self) -> Result<bool, SpaCyError> { self.get_attr("is_alpha") }
-    pub fn is_ascii(&self) -> Result<bool, SpaCyError> { self.get_attr("is_ascii") }
-    pub fn is_digit(&self) -> Result<bool, SpaCyError> { self.get_attr("is_digit") }
-    pub fn is_lower(&self) -> Result<bool, SpaCyError> { self.get_attr("is_lower") }
-    pub fn is_upper(&self) -> Result<bool, SpaCyError> { self.get_attr("is_upper") }
-    pub fn is_title(&self) -> Result<bool, SpaCyError> { self.get_attr("is_title") }
-    pub fn is_punct(&self) -> Result<bool, SpaCyError> { self.get_attr("is_punct") }
-    pub fn is_space(&self) -> Result<bool, SpaCyError> { self.get_attr("is_space") }
-    pub fn is_stop(&self) -> Result<bool, SpaCyError> { self.get_attr("is_stop") }
-    pub fn like_num(&self) -> Result<bool, SpaCyError> { self.get_attr("like_num") }
-    pub fn like_email(&self) -> Result<bool, SpaCyError> { self.get_attr("like_email") }
-    pub fn like_url(&self) -> Result<bool, SpaCyError> { self.get_attr("like_url") }
+    pub fn is_alpha(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_alpha")
+    }
+    pub fn is_ascii(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_ascii")
+    }
+    pub fn is_digit(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_digit")
+    }
+    pub fn is_lower(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_lower")
+    }
+    pub fn is_upper(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_upper")
+    }
+    pub fn is_title(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_title")
+    }
+    pub fn is_punct(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_punct")
+    }
+    pub fn is_space(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_space")
+    }
+    pub fn is_stop(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("is_stop")
+    }
+    pub fn like_num(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("like_num")
+    }
+    pub fn like_email(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("like_email")
+    }
+    pub fn like_url(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("like_url")
+    }
 
     // Vectors & context
     pub fn vector(&self) -> Result<Vec<f32>, SpaCyError> {
@@ -100,7 +162,9 @@ impl Token {
         })
     }
 
-    pub fn has_vector(&self) -> Result<bool, SpaCyError> { self.get_attr("has_vector") }
+    pub fn has_vector(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("has_vector")
+    }
 
     pub fn similarity(&self, other: &Token) -> Result<f64, SpaCyError> {
         with_gil(|py| {
@@ -113,7 +177,9 @@ impl Token {
     }
 
     // Position & scope
-    pub fn idx(&self) -> Result<usize, SpaCyError> { self.get_attr("idx") }
+    pub fn idx(&self) -> Result<usize, SpaCyError> {
+        self.get_attr("idx")
+    }
 
     pub fn sent(&self) -> Result<Span, SpaCyError> {
         with_gil(|py| {

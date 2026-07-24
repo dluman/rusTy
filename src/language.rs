@@ -1,7 +1,7 @@
+use crate::utils::with_gil;
+use crate::{Doc, SpaCyError, Vocab};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyDictMethods, PyList};
-use crate::{SpaCyError, Doc, Vocab};
-use crate::utils::with_gil;
 
 #[derive(Debug, Clone)]
 pub struct Language {
@@ -72,12 +72,7 @@ impl Language {
         })
     }
 
-    pub fn add_pipe(
-        &self,
-        name: &str,
-        config: Option<&str>,
-        last: bool,
-    ) -> Result<(), SpaCyError> {
+    pub fn add_pipe(&self, name: &str, config: Option<&str>, last: bool) -> Result<(), SpaCyError> {
         with_gil(|py| {
             let obj = self.obj.bind(py);
             let kwargs = PyDict::new_bound(py);
@@ -85,7 +80,8 @@ impl Language {
                 kwargs.set_item("last", true)?;
             }
             if let Some(cfg) = config {
-                let cfg_dict: Bound<'_, PyDict> = py.import_bound("json")?
+                let cfg_dict: Bound<'_, PyDict> = py
+                    .import_bound("json")?
                     .getattr("loads")?
                     .call1((cfg,))?
                     .extract()?;

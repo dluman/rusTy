@@ -1,6 +1,6 @@
+use crate::utils::{extract_vec_f32, with_gil};
+use crate::{Doc, SpaCyError, Token};
 use pyo3::prelude::*;
-use crate::{SpaCyError, Token, Doc};
-use crate::utils::{with_gil, extract_vec_f32};
 
 #[derive(Debug, Clone)]
 pub struct Span {
@@ -23,13 +23,27 @@ impl Span {
         })
     }
 
-    pub fn text(&self) -> Result<String, SpaCyError> { self.get_attr("text") }
-    pub fn start(&self) -> Result<usize, SpaCyError> { self.get_attr("start") }
-    pub fn end(&self) -> Result<usize, SpaCyError> { self.get_attr("end") }
-    pub fn start_char(&self) -> Result<usize, SpaCyError> { self.get_attr("start_char") }
-    pub fn end_char(&self) -> Result<usize, SpaCyError> { self.get_attr("end_char") }
-    pub fn label_(&self) -> Result<String, SpaCyError> { self.get_attr("label_") }
-    pub fn kb_id_(&self) -> Result<String, SpaCyError> { self.get_attr("kb_id_") }
+    pub fn text(&self) -> Result<String, SpaCyError> {
+        self.get_attr("text")
+    }
+    pub fn start(&self) -> Result<usize, SpaCyError> {
+        self.get_attr("start")
+    }
+    pub fn end(&self) -> Result<usize, SpaCyError> {
+        self.get_attr("end")
+    }
+    pub fn start_char(&self) -> Result<usize, SpaCyError> {
+        self.get_attr("start_char")
+    }
+    pub fn end_char(&self) -> Result<usize, SpaCyError> {
+        self.get_attr("end_char")
+    }
+    pub fn label_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("label_")
+    }
+    pub fn kb_id_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("kb_id_")
+    }
 
     pub fn tokens(&self) -> Result<Vec<Token>, SpaCyError> {
         with_gil(|py| {
@@ -74,7 +88,9 @@ impl Span {
         })
     }
 
-    pub fn has_vector(&self) -> Result<bool, SpaCyError> { self.get_attr("has_vector") }
+    pub fn has_vector(&self) -> Result<bool, SpaCyError> {
+        self.get_attr("has_vector")
+    }
 
     pub fn similarity(&self, other: &Span) -> Result<f64, SpaCyError> {
         with_gil(|py| {
