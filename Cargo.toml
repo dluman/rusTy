@@ -5,7 +5,7 @@ authors = ["Douglas Luman <dluman@douglasjluman.com>"]
 edition = "2021"
 
 [dependencies]
-pyo3 = { version = "0.21", features = ["abi3-py38"] }
+pyo3 = { version = "0.21", features = ["abi3-py38", "auto-initialize"] }
 numpy = "0.21"
 thiserror = "1"
 serde = { version = "1.0", features = ["derive"] }

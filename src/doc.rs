@@ -148,7 +148,7 @@ impl Doc {
             let tokens_mod = py.import_bound("spacy.tokens")?;
             let doc_cls = tokens_mod.getattr("Doc")?;
             let doc = doc_cls.call1((vocab,))?;
-            doc.call_method1("from_bytes", (bytes,))?;
+            let doc = doc.call_method1("from_bytes", (bytes,))?;
             Ok(Doc::new(doc.into()))
         })
     }
