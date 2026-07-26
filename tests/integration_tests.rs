@@ -1,4 +1,4 @@
-use spacy_rs::Language;
+use rusty::Language;
 
 fn get_nlp() -> Language {
     Language::load("en_core_web_sm").expect(
@@ -131,7 +131,7 @@ fn test_serialization_roundtrip() {
     let nlp = get_nlp();
     let doc = nlp.nlp("Hello, world!").unwrap();
     let bytes = doc.to_bytes().unwrap();
-    let doc2 = spacy_rs::Doc::from_bytes(&nlp, &bytes).unwrap();
+    let doc2 = rusty::Doc::from_bytes(&nlp, &bytes).unwrap();
     assert_eq!(doc.text().unwrap(), doc2.text().unwrap());
 }
 

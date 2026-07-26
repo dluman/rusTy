@@ -19,13 +19,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-spacy_rs = "0.1"
+rusty = "0.5"
 ```
 
 ## Quick Start
 
 ```rust
-use spacy_rs::Language;
+use rusty::Language;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load a spaCy model
@@ -179,7 +179,7 @@ let doc = nlp.nlp("Hello, world!")?;
 let bytes = doc.to_bytes()?;
 
 // From bytes
-let doc2 = spacy_rs::Doc::from_bytes(&nlp, &bytes)?;
+let doc2 = rusty::Doc::from_bytes(&nlp, &bytes)?;
 assert_eq!(doc.text()?, doc2.text()?);
 
 // To JSON

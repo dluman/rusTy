@@ -1,4 +1,4 @@
-use spacy_rs::Language;
+use rusty::Language;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nlp = Language::load("en_core_web_lg")?;

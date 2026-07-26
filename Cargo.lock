@@ -274,6 +274,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
+name = "rusty"
+version = "0.5.0"
+dependencies = [
+ "numpy",
+ "pyo3",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -321,17 +332,6 @@ name = "smallvec"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
-
-[[package]]
-name = "spacy_rs"
-version = "0.1.0"
-dependencies = [
- "numpy",
- "pyo3",
- "serde",
- "serde_json",
- "thiserror",
-]
 
 [[package]]
 name = "syn"

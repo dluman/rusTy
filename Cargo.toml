@@ -1,8 +1,14 @@
 [package]
-name = "spacy_rs"
-version = "0.1.0"
+name = "rusty"
+version = "0.5.0"
 authors = ["Douglas Luman <dluman@douglasjluman.com>"]
 edition = "2021"
+description = "Idiomatic Rust bindings for the spaCy Python NLP library"
+repository = "https://github.com/dluman/rusTy.git"
+readme = "README.md"
+license = "CC0-1.0"
+keywords = ["spacy", "nlp", "python", "pyo3", "bindings"]
+categories = ["api-bindings", "text-processing"]
 
 [dependencies]
 pyo3 = { version = "0.21", features = ["abi3-py38", "auto-initialize"] }
