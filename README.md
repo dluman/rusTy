@@ -96,6 +96,7 @@ Represents a processed document.
 | `ents()` | Named entities (as `Span`s) |
 | `sents()` | Sentences (as `Span`s) |
 | `noun_chunks()` | Noun chunks (as `Span`s) |
+| `char_span(start, end, label, kb_id, alignment_mode)` | Create `Span` from character offsets |
 | `vector()` | Document vector (`Vec<f32>`) |
 | `has_vector()` | Check if vector exists |
 | `similarity(other)` | Cosine similarity with another `Doc` |
@@ -107,11 +108,13 @@ Represents a processed document.
 
 Represents a single token.
 
-**Text & Morphology:** `text()`, `orth_()`, `lemma_()`, `norm_()`, `lower_()`, `shape_()`, `prefix_()`, `suffix_()`
+**Text & Morphology:** `text()`, `orth_()`, `lemma_()`, `norm_()`, `lower_()`, `shape_()`, `prefix_()`, `suffix_()`, `morph_()`, `whitespace_()`
 
 **POS & Dependencies:** `pos_()`, `tag_()`, `dep_()`, `head()`, `children()`, `lefts()`, `rights()`, `ancestors()`, `subtree()`, `nbor(offset)`
 
-**Entities:** `ent_type_()`, `ent_iob_()`, `ent_kb_id_()`
+**Entities:** `ent_type_()`, `ent_iob_()`, `ent_kb_id_()`, `ent_id_()`
+
+**Lexeme:** `rank()`, `prob()`, `cluster()`
 
 **Flags:** `is_alpha()`, `is_ascii()`, `is_digit()`, `is_lower()`, `is_upper()`, `is_title()`, `is_punct()`, `is_space()`, `is_stop()`, `like_num()`, `like_email()`, `like_url()`
 
@@ -128,7 +131,8 @@ Represents a contiguous slice of tokens.
 | `text()` | Span text |
 | `start()`, `end()` | Token indices |
 | `start_char()`, `end_char()` | Character indices |
-| `label_()` | Entity/predicate label |
+| `label_()` | Entity/predicate label (string) |
+| `label()` | Entity/predicate label (int hash) |
 | `kb_id_()` | Knowledge base ID |
 | `tokens()` | Tokens in the span |
 | `root()` | Root token of the span |

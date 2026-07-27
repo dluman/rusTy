@@ -1,6 +1,7 @@
 use crate::utils::{extract_vec_f32, with_gil};
 use crate::{Language, SpaCyError, Span, Token};
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyDictMethods};
 use serde_json::Value;
 
 #[derive(Debug, Clone)]
@@ -94,6 +95,35 @@ impl Doc {
                 spans.push(Span::new(chunk?.into()));
             }
             Ok(spans)
+        })
+    }
+
+    pub fn char_span(
+        &self,
+        start_char: usize,
+        end_char: usize,
+        label: Option<&str>,
+        kb_id: Option<&str>,
+        alignment_mode: Option<&str>,
+    ) -> Result<Option<Span>, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let kwargs = PyDict::new_bound(py);
+            if let Some(lbl) = label {
+                kwargs.set_item("label", lbl)?;
+            }
+            if let Some(id) = kb_id {
+                kwargs.set_item("kb_id", id)?;
+            }
+            if let Some(mode) = alignment_mode {
+                kwargs.set_item("alignment_mode", mode)?;
+            }
+            let span = obj.call_method("char_span", (start_char, end_char), Some(&kwargs))?;
+            if span.is_none() {
+                Ok(None)
+            } else {
+                Ok(Some(Span::new(span.into())))
+            }
         })
     }
 

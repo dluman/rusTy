@@ -60,6 +60,18 @@ impl Token {
     pub fn suffix_(&self) -> Result<String, SpaCyError> {
         self.get_attr("suffix_")
     }
+    pub fn morph_(&self) -> Result<String, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let morph = obj.getattr("morph")?;
+            let s = morph.str()?;
+            let s: String = s.extract()?;
+            Ok(s)
+        })
+    }
+    pub fn whitespace_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("whitespace_")
+    }
 
     // POS & Dependencies
     pub fn pos_(&self) -> Result<String, SpaCyError> {
@@ -113,6 +125,20 @@ impl Token {
     }
     pub fn ent_kb_id_(&self) -> Result<String, SpaCyError> {
         self.get_attr("ent_kb_id_")
+    }
+    pub fn ent_id_(&self) -> Result<String, SpaCyError> {
+        self.get_attr("ent_id_")
+    }
+
+    // Lexeme features
+    pub fn rank(&self) -> Result<u64, SpaCyError> {
+        self.get_attr("rank")
+    }
+    pub fn prob(&self) -> Result<f64, SpaCyError> {
+        self.get_attr("prob")
+    }
+    pub fn cluster(&self) -> Result<u64, SpaCyError> {
+        self.get_attr("cluster")
     }
 
     // Booleans

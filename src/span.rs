@@ -41,6 +41,9 @@ impl Span {
     pub fn label_(&self) -> Result<String, SpaCyError> {
         self.get_attr("label_")
     }
+    pub fn label(&self) -> Result<i64, SpaCyError> {
+        self.get_attr("label")
+    }
     pub fn kb_id_(&self) -> Result<String, SpaCyError> {
         self.get_attr("kb_id_")
     }

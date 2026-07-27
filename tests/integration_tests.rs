@@ -204,3 +204,96 @@ fn test_vocab_strings() {
     let retrieved = strings.get_string(hash).unwrap();
     assert_eq!(retrieved, "testword");
 }
+
+#[test]
+fn test_token_morph() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apples are tasty.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let apples = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Apples")
+        .unwrap();
+    let morph = apples.morph_().unwrap();
+    // spaCy v3 morphology is a pipe-delimited string like "Number=Plur"
+    assert!(!morph.is_empty());
+}
+
+#[test]
+fn test_token_whitespace() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let hello = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Hello")
+        .unwrap();
+    // "Hello" is followed by a space in "Hello world."
+    assert_eq!(hello.whitespace_().unwrap(), " ");
+}
+
+#[test]
+fn test_token_ent_id() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying a startup.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let apple = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Apple")
+        .unwrap();
+    // ent_id_ is typically empty unless entity linking is configured
+    let _ent_id = apple.ent_id_().unwrap();
+}
+
+#[test]
+fn test_token_lexeme_features() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is great.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let apple = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Apple")
+        .unwrap();
+
+    // rank, prob, and cluster return valid values for known words
+    let _rank = apple.rank().unwrap();
+    let prob = apple.prob().unwrap();
+    // Probability is typically a negative log probability (negative or zero)
+    assert!(prob.is_finite());
+    let _cluster = apple.cluster().unwrap();
+}
+
+#[test]
+fn test_doc_char_span() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying a startup.").unwrap();
+    // "Apple" starts at char 0 and ends at char 5
+    let span = doc.char_span(0, 5, None, None, None).unwrap();
+    assert!(span.is_some());
+    assert_eq!(span.unwrap().text().unwrap(), "Apple");
+
+    // Invalid strict span should return None
+    let bad = doc.char_span(2, 8, None, None, Some("strict")).unwrap();
+    assert!(bad.is_none());
+
+    // Expand mode should pick up overlapping tokens
+    let expanded = doc
+        .char_span(2, 8, None, None, Some("expand"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(expanded.text().unwrap(), "Apple is");
+}
+
+#[test]
+fn test_span_label_int() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying a startup.").unwrap();
+    let ents = doc.ents().unwrap();
+    assert!(!ents.is_empty());
+    let first = &ents[0];
+    // label_() is the string label, label() is the integer hash
+    let label_str = first.label_().unwrap();
+    let label_int = first.label().unwrap();
+    assert!(!label_str.is_empty());
+    assert!(label_int != 0);
+}
