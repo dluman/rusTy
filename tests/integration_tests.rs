@@ -1,4 +1,4 @@
-use rusty::Language;
+use rusty::{Head, Language, Matcher, PatternValue, PhraseMatcher, TokenPattern};
 
 fn get_nlp() -> Language {
     Language::load("en_core_web_sm").expect(
@@ -296,4 +296,157 @@ fn test_span_label_int() {
     let label_int = first.label().unwrap();
     assert!(!label_str.is_empty());
     assert!(label_int != 0);
+}
+
+#[test]
+fn test_matcher_basic() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let vocab = doc.vocab().unwrap();
+    let matcher = Matcher::new(&vocab, false).unwrap();
+    matcher
+        .add("GREETING", vec![TokenPattern::new().orth("Hello")])
+        .unwrap();
+    let matches = matcher.call(&doc).unwrap();
+    assert!(!matches.is_empty());
+    assert_eq!(matches[0].start, 0);
+    assert_eq!(matches[0].end, 1);
+}
+
+#[test]
+fn test_matcher_in() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let vocab = doc.vocab().unwrap();
+    let matcher = Matcher::new(&vocab, false).unwrap();
+    matcher
+        .add(
+            "GREETING",
+            vec![TokenPattern::new()
+                .orth(PatternValue::in_list(vec!["Hello".into(), "Hi".into()]))],
+        )
+        .unwrap();
+    let matches = matcher.call(&doc).unwrap();
+    assert!(!matches.is_empty());
+}
+
+#[test]
+fn test_matcher_as_spans() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let vocab = doc.vocab().unwrap();
+    let matcher = Matcher::new(&vocab, false).unwrap();
+    matcher
+        .add("GREETING", vec![TokenPattern::new().orth("Hello")])
+        .unwrap();
+    let spans = matcher.call_as_spans(&doc).unwrap();
+    assert!(!spans.is_empty());
+    assert_eq!(spans[0].text().unwrap(), "Hello");
+}
+
+#[test]
+fn test_phrase_matcher() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let vocab = doc.vocab().unwrap();
+    let pattern_doc = nlp.nlp("Hello").unwrap();
+    let matcher = PhraseMatcher::new(&vocab, None, false).unwrap();
+    matcher.add("GREETING", &[pattern_doc]).unwrap();
+    let matches = matcher.call(&doc).unwrap();
+    assert!(!matches.is_empty());
+    assert_eq!(matches[0].start, 0);
+    assert_eq!(matches[0].end, 1);
+}
+
+#[test]
+fn test_retokenize_merge() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("New York").unwrap();
+    let span = doc
+        .char_span(0, 8, None, None, None)
+        .unwrap()
+        .expect("valid char span");
+    {
+        let mut retokenizer = doc.retokenize().unwrap();
+        retokenizer.merge(&span, None).unwrap();
+    }
+    let tokens = doc.tokens().unwrap();
+    assert_eq!(tokens.len(), 1);
+    assert_eq!(tokens[0].text().unwrap(), "New York");
+}
+
+#[test]
+fn test_retokenize_split() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("NewYork").unwrap();
+    let token = doc.token(0).unwrap();
+    {
+        let mut retokenizer = doc.retokenize().unwrap();
+        // one head per subtoken
+        let heads = vec![Head::Token(token.clone()), Head::Token(token.clone())];
+        retokenizer
+            .split(&token, &["New", "York"], &heads, None)
+            .unwrap();
+    }
+    let tokens = doc.tokens().unwrap();
+    assert_eq!(tokens[0].text().unwrap(), "New");
+    assert_eq!(tokens[1].text().unwrap(), "York");
+}
+
+#[test]
+fn test_span_groups() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying a startup.").unwrap();
+    let spans = doc.spans().unwrap();
+    let ents = doc.ents().unwrap();
+    if !ents.is_empty() {
+        spans.set("ents", &[ents[0].clone()]).unwrap();
+        let group = spans.get("ents").unwrap().unwrap();
+        assert_eq!(group.len().unwrap(), 1);
+    }
+}
+
+#[test]
+fn test_doc_cats() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let cats = doc.cats().unwrap();
+    // en_core_web_sm has no textcat component
+    assert!(cats.is_empty());
+}
+
+#[test]
+fn test_doc_vector_norm() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let norm = doc.vector_norm().unwrap();
+    assert!(norm >= 0.0);
+}
+
+#[test]
+fn test_span_vector_norm() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let sents = doc.sents().unwrap();
+    if !sents.is_empty() {
+        let norm = sents[0].vector_norm().unwrap();
+        assert!(norm >= 0.0);
+    }
+}
+
+#[test]
+fn test_has_annotation() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    assert!(doc.has_annotation("TAG", false).unwrap());
+    assert!(doc.has_annotation("DEP", false).unwrap());
+}
+
+#[test]
+fn test_count_by() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    // spaCy POS attribute ID = 74
+    let counts = doc.count_by(74).unwrap();
+    assert!(!counts.is_empty());
 }
