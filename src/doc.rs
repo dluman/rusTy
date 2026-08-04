@@ -264,4 +264,39 @@ impl Doc {
             Ok(Doc::new(doc.into()))
         })
     }
+
+    pub fn to_disk(&self, path: &str) -> Result<(), SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            obj.call_method1("to_disk", (path,))?;
+            Ok(())
+        })
+    }
+
+    pub fn from_disk(lang: &Language, path: &str) -> Result<Doc, SpaCyError> {
+        with_gil(|py| {
+            let vocab = lang.obj.bind(py).getattr("vocab")?;
+            let tokens_mod = py.import_bound("spacy.tokens")?;
+            let doc_cls = tokens_mod.getattr("Doc")?;
+            let doc = doc_cls.call1((vocab,))?;
+            let doc = doc.call_method1("from_disk", (path,))?;
+            Ok(Doc::new(doc.into()))
+        })
+    }
+
+    pub fn from_json(lang: &Language, json: &serde_json::Value) -> Result<Doc, SpaCyError> {
+        with_gil(|py| {
+            let vocab = lang.obj.bind(py).getattr("vocab")?;
+            let tokens_mod = py.import_bound("spacy.tokens")?;
+            let doc_cls = tokens_mod.getattr("Doc")?;
+            let doc = doc_cls.call1((vocab,))?;
+            let json_str = serde_json::to_string(json)?;
+            let json_py = py
+                .import_bound("json")?
+                .getattr("loads")?
+                .call1((json_str,))?;
+            let doc = doc.call_method("from_json", (json_py,), None)?;
+            Ok(Doc::new(doc.into()))
+        })
+    }
 }

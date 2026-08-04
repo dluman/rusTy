@@ -202,6 +202,10 @@ impl Token {
         })
     }
 
+    pub fn vector_norm(&self) -> Result<f64, SpaCyError> {
+        self.get_attr("vector_norm")
+    }
+
     // Position & scope
     pub fn idx(&self) -> Result<usize, SpaCyError> {
         self.get_attr("idx")
