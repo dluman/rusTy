@@ -1,7 +1,9 @@
 use rusty::{
-    Doc, DocBin, EntityPattern, EntityRuler, Head, Language, Matcher, PatternValue, PhraseMatcher,
-    TokenPattern,
+    DependencyMatcher, DependencyPatternNode, Doc, DocBin, EntityPattern, EntityRuler,
+    ExtensionDefinition, Head, Language, Matcher, MorphAnalysis, PatternValue, PhraseMatcher,
+    Token, TokenPattern,
 };
+use serde_json::json;
 
 fn get_nlp() -> Language {
     Language::load("en_core_web_sm").expect(
@@ -582,4 +584,183 @@ fn test_entity_ruler_bytes_roundtrip() {
     let bytes = ruler.to_bytes().unwrap();
     ruler.from_bytes(&bytes).unwrap();
     assert_eq!(ruler.len().unwrap(), 1);
+}
+
+// === Tier 4: Extensions, DependencyMatcher, Pipeline helpers, MorphAnalysis ===
+
+#[test]
+fn test_doc_attribute_extension() {
+    let nlp = get_nlp();
+    Doc::set_extension(
+        "doc_id",
+        ExtensionDefinition::Attribute { default: json!(0) },
+        true,
+    )
+    .unwrap();
+    assert!(Doc::has_extension("doc_id").unwrap());
+
+    let doc = nlp.nlp("Hello world.").unwrap();
+    assert!(doc.has_underscore("doc_id").unwrap());
+    doc.set_underscore("doc_id", json!(42)).unwrap();
+    assert_eq!(doc.get_underscore("doc_id").unwrap(), json!(42));
+
+    let info = Doc::remove_extension("doc_id").unwrap();
+    assert!(info.default.is_some());
+    assert!(!info.has_getter);
+    assert!(!info.has_setter);
+    assert!(!info.has_method);
+}
+
+#[test]
+fn test_doc_property_extension() {
+    let nlp = get_nlp();
+    Doc::set_extension(
+        "upper_text",
+        ExtensionDefinition::Property {
+            getter: "lambda doc: doc.text.upper()".to_string(),
+            setter: None,
+        },
+        true,
+    )
+    .unwrap();
+
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let val = doc.get_underscore("upper_text").unwrap();
+    assert_eq!(val, "HELLO WORLD.");
+
+    Doc::remove_extension("upper_text").unwrap();
+}
+
+#[test]
+fn test_doc_method_extension_kwargs() {
+    let nlp = get_nlp();
+    Doc::set_extension(
+        "has_word",
+        ExtensionDefinition::Method {
+            method: "lambda doc, word: word in doc.text".to_string(),
+        },
+        true,
+    )
+    .unwrap();
+
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let mut kwargs = std::collections::HashMap::new();
+    kwargs.insert("word".to_string(), json!("world"));
+    let result = doc.call_underscore("has_word", &[], &kwargs).unwrap();
+    assert_eq!(result, json!(true));
+
+    Doc::remove_extension("has_word").unwrap();
+}
+
+#[test]
+fn test_token_attribute_extension() {
+    let nlp = get_nlp();
+    Token::set_extension(
+        "is_greeting",
+        ExtensionDefinition::Attribute {
+            default: json!(false),
+        },
+        true,
+    )
+    .unwrap();
+
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let token = doc.token(0).unwrap();
+    assert_eq!(token.get_underscore("is_greeting").unwrap(), json!(false));
+    token.set_underscore("is_greeting", json!(true)).unwrap();
+    assert_eq!(token.get_underscore("is_greeting").unwrap(), json!(true));
+
+    Token::remove_extension("is_greeting").unwrap();
+}
+
+#[test]
+fn test_dependency_matcher_basic() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("I like apples.").unwrap();
+    let vocab = doc.vocab().unwrap();
+    let matcher = DependencyMatcher::new(&vocab, false).unwrap();
+
+    // Pattern: find a token whose head is "like" (direct dependent)
+    let pattern = vec![vec![
+        DependencyPatternNode {
+            left_id: None,
+            rel_op: None,
+            right_id: "like".to_string(),
+            right_attrs: TokenPattern::new().lower("like"),
+        },
+        DependencyPatternNode {
+            left_id: Some("like".to_string()),
+            rel_op: Some(">".to_string()),
+            right_id: "subject".to_string(),
+            right_attrs: TokenPattern::new().dep("nsubj"),
+        },
+    ]];
+    matcher.add("SUBJ", pattern).unwrap();
+    let matches = matcher.call(&doc).unwrap();
+    assert!(!matches.is_empty());
+    assert_eq!(
+        matches[0].id,
+        vocab.strings().unwrap().get_hash("SUBJ").unwrap() as u64
+    );
+}
+
+#[test]
+fn test_language_pipe_names() {
+    let nlp = get_nlp();
+    let names = nlp.pipe_names().unwrap();
+    assert!(!names.is_empty());
+}
+
+#[test]
+fn test_language_rename_pipe() {
+    let nlp = get_nlp();
+    let old_names = nlp.pipe_names().unwrap();
+    if old_names.iter().any(|s| s == "ner") {
+        nlp.rename_pipe("ner", "my_ner").unwrap();
+        let new_names = nlp.pipe_names().unwrap();
+        assert!(!new_names.iter().any(|s| s == "ner"));
+        assert!(new_names.iter().any(|s| s == "my_ner"));
+        nlp.rename_pipe("my_ner", "ner").unwrap(); // restore
+    }
+}
+
+#[test]
+fn test_language_disabled() {
+    let nlp = get_nlp();
+    let disabled = nlp.disabled().unwrap();
+    // en_core_web_sm may have some disabled pipes (e.g. senter)
+    // just check it returns a Vec
+    assert!(disabled.iter().all(|s| !s.is_empty()));
+}
+
+#[test]
+fn test_token_morph_analysis() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apples are tasty.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let apples = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Apples")
+        .unwrap();
+    let morph = apples.morph().unwrap();
+    assert!(morph.len().unwrap() > 0);
+    let s = morph.to_string().unwrap();
+    assert!(!s.is_empty());
+}
+
+#[test]
+fn test_morph_analysis_dict() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apples are tasty.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let apples = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Apples")
+        .unwrap();
+    let morph = apples.morph().unwrap();
+    let dict = morph.to_dict().unwrap();
+    assert!(!dict.is_empty());
+    // Check that Number=Plur (or similar) is present for plural nouns
+    let features = morph.features().unwrap();
+    assert!(!features.is_empty());
 }

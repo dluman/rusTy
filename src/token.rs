@@ -1,6 +1,13 @@
+use crate::extensions::{
+    py_call_underscore, py_get_underscore, py_has_extension, py_has_underscore,
+    py_remove_extension, py_set_extension, py_set_underscore, ExtensionDefinition, ExtensionInfo,
+};
+use crate::morph::MorphAnalysis;
 use crate::utils::{extract_vec_f32, with_gil};
 use crate::{Doc, SpaCyError, Span};
 use pyo3::prelude::*;
+use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Token {
@@ -69,6 +76,14 @@ impl Token {
             Ok(s)
         })
     }
+    pub fn morph(&self) -> Result<MorphAnalysis, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let morph = obj.getattr("morph")?;
+            Ok(MorphAnalysis::new(morph.into()))
+        })
+    }
+
     pub fn whitespace_(&self) -> Result<String, SpaCyError> {
         self.get_attr("whitespace_")
     }
@@ -224,6 +239,55 @@ impl Token {
             let obj = self.obj.bind(py);
             let doc = obj.getattr("doc")?;
             Ok(Doc::new(doc.into()))
+        })
+    }
+
+    pub fn set_extension(
+        name: &str,
+        def: ExtensionDefinition,
+        force: bool,
+    ) -> Result<(), SpaCyError> {
+        with_gil(|py| py_set_extension(py, "Token", name, &def, force))
+    }
+
+    pub fn has_extension(name: &str) -> Result<bool, SpaCyError> {
+        with_gil(|py| py_has_extension(py, "Token", name))
+    }
+
+    pub fn remove_extension(name: &str) -> Result<ExtensionInfo, SpaCyError> {
+        with_gil(|py| py_remove_extension(py, "Token", name))
+    }
+
+    pub fn get_underscore(&self, name: &str) -> Result<Value, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_get_underscore(obj, name)
+        })
+    }
+
+    pub fn set_underscore(&self, name: &str, value: Value) -> Result<(), SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_set_underscore(obj, name, value)
+        })
+    }
+
+    pub fn has_underscore(&self, name: &str) -> Result<bool, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_has_underscore(obj, name)
+        })
+    }
+
+    pub fn call_underscore(
+        &self,
+        name: &str,
+        args: &[Value],
+        kwargs: &HashMap<String, Value>,
+    ) -> Result<Value, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_call_underscore(obj, name, args, kwargs)
         })
     }
 }

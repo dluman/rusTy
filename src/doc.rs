@@ -1,3 +1,7 @@
+use crate::extensions::{
+    py_call_underscore, py_get_underscore, py_has_extension, py_has_underscore,
+    py_remove_extension, py_set_extension, py_set_underscore, ExtensionDefinition, ExtensionInfo,
+};
 use crate::utils::{extract_vec_f32, with_gil};
 use crate::{Language, RetokenizerGuard, SpaCyError, Span, SpanGroups, Token, Vocab};
 use pyo3::prelude::*;
@@ -297,6 +301,57 @@ impl Doc {
                 .call1((json_str,))?;
             let doc = doc.call_method("from_json", (json_py,), None)?;
             Ok(Doc::new(doc.into()))
+        })
+    }
+
+    // Extension class methods
+    pub fn set_extension(
+        name: &str,
+        def: ExtensionDefinition,
+        force: bool,
+    ) -> Result<(), SpaCyError> {
+        with_gil(|py| py_set_extension(py, "Doc", name, &def, force))
+    }
+
+    pub fn has_extension(name: &str) -> Result<bool, SpaCyError> {
+        with_gil(|py| py_has_extension(py, "Doc", name))
+    }
+
+    pub fn remove_extension(name: &str) -> Result<ExtensionInfo, SpaCyError> {
+        with_gil(|py| py_remove_extension(py, "Doc", name))
+    }
+
+    // Instance access to ._ namespace
+    pub fn get_underscore(&self, name: &str) -> Result<serde_json::Value, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_get_underscore(obj, name)
+        })
+    }
+
+    pub fn set_underscore(&self, name: &str, value: serde_json::Value) -> Result<(), SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_set_underscore(obj, name, value)
+        })
+    }
+
+    pub fn has_underscore(&self, name: &str) -> Result<bool, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_has_underscore(obj, name)
+        })
+    }
+
+    pub fn call_underscore(
+        &self,
+        name: &str,
+        args: &[serde_json::Value],
+        kwargs: &HashMap<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            py_call_underscore(obj, name, args, kwargs)
         })
     }
 }
