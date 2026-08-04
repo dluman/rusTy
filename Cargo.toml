@@ -1,6 +1,6 @@
 [package]
 name = "rusty"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Douglas Luman <dluman@douglasjluman.com>"]
 edition = "2021"
 description = "Idiomatic Rust bindings for the spaCy Python NLP library"
