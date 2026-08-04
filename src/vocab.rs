@@ -1,4 +1,4 @@
-use crate::{utils::with_gil, SpaCyError};
+use crate::{utils::with_gil, SpaCyError, Vectors};
 use pyo3::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,14 @@ impl Vocab {
             Ok(StringStore {
                 obj: strings.into(),
             })
+        })
+    }
+
+    pub fn vectors(&self) -> Result<Vectors, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let vectors = obj.getattr("vectors")?;
+            Ok(Vectors::new(vectors.into()))
         })
     }
 }

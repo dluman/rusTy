@@ -129,7 +129,7 @@ Represents a single token.
 
 **Entities:** `ent_type_()`, `ent_iob_()`, `ent_kb_id_()`, `ent_id_()`
 
-**Lexeme:** `rank()`, `prob()`, `cluster()`
+**Lexeme:** `lexeme()`, `rank()`, `prob()`, `cluster()`
 
 **Flags:** `is_alpha()`, `is_ascii()`, `is_digit()`, `is_lower()`, `is_upper()`, `is_title()`, `is_punct()`, `is_space()`, `is_stop()`, `like_num()`, `like_email()`, `like_url()`
 
@@ -164,9 +164,90 @@ Represents a contiguous slice of tokens.
 | Method | Description |
 |--------|-------------|
 | `vocab.strings()` | Access the string store |
+| `vocab.vectors()` | Access the vocab's `Vectors` |
 | `strings.add(string)` | Add a string, get its hash |
 | `strings.get_hash(string)` | Get hash for a string |
 | `strings.get_string(hash)` | Look up string by hash |
+
+### `Vectors`
+
+Word vector table backed by numpy. Keys are 64-bit hashes from the vocab's string store.
+
+```rust
+use rusty::{Language, Vectors};
+
+let nlp = Language::load("en_core_web_sm")?;
+let vocab = nlp.vocab()?;
+let vectors = Vectors::new_table(&vocab, Some((10, 4)))?;
+vectors.add("hello", Some(&[1.0, 2.0, 3.0, 4.0]), None)?;
+let vec = vectors.get("hello")?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new_table(vocab, shape)` | Create a new vector table (`shape`: `(rows, dims)`) |
+| `add(key, vector, row)` | Add a vector; returns assigned row |
+| `get(key)` | Retrieve vector by string key |
+| `find(key, row)` | Look up row by key or key by row |
+| `contains(hash)` | Check if a key hash exists |
+| `keys()` | All key hashes in the table |
+| `len()` | Number of rows |
+| `shape()` | `(rows, dims)` |
+| `most_similar(queries, n, batch_size)` | Find `n` most similar vectors |
+| `to_bytes()` / `from_bytes(vocab, bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(vocab, path)` | Disk serialization |
+
+### `Lexeme`
+
+Represents a word type independent of context.
+
+```rust
+let token = doc.token(0)?;
+let lexeme = token.lexeme()?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `orth_()` | Canonical string form |
+| `lower_()` | Lowercased form |
+| `norm_()` | Normalized form |
+| `shape_()` | Word shape |
+| `prefix_()` / `suffix_()` | Prefix / suffix |
+| `lang_()` | Language code |
+| `is_alpha()` / `is_ascii()` / `is_digit()` / `is_lower()` / `is_upper()` / `is_title()` / `is_punct()` / `is_space()` / `is_stop()` | Boolean flags |
+| `like_num()` / `like_email()` / `like_url()` | Pattern matches |
+| `prob()` | Log probability |
+| `cluster()` | Brown cluster ID |
+| `rank()` | Frequency rank |
+| `vector()` / `vector_norm()` / `has_vector()` | Vector access |
+
+### `SpanRuler`
+
+Pipeline component for rule-based span recognition using `SpanPattern`.
+
+```rust
+use rusty::{SpanRuler, SpanPattern};
+
+let ruler = SpanRuler::new(&nlp, None, false, false, None)?;
+let patterns = vec![
+    SpanPattern::phrase("ORG", "Apple Inc."),
+    SpanPattern::tokens("ORG", vec![TokenPattern::new().orth("Apple")]),
+];
+ruler.add_patterns(&patterns)?;
+let doc = ruler.call(&nlp.nlp("Apple Inc. is hiring.")?)?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(language, phrase_matcher_attr, validate, overwrite_ents, patterns)` | Create a `SpanRuler` |
+| `add_patterns(patterns)` | Add typed `SpanPattern`s |
+| `add_patterns_raw(json)` | Add raw JSON patterns |
+| `call(doc)` | Process a `Doc` and add spans |
+| `labels()` | All span labels |
+| `spans_key()` | Default span group key |
+| `len()` / `is_empty()` | Number of patterns |
+| `to_bytes()` / `from_bytes(bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(path)` | Disk serialization |
 
 ### `Matcher`
 

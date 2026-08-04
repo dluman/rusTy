@@ -1,7 +1,7 @@
 use rusty::{
     DependencyMatcher, DependencyPatternNode, Doc, DocBin, EntityPattern, EntityRuler,
-    ExtensionDefinition, Head, Language, Matcher, MorphAnalysis, PatternValue, PhraseMatcher,
-    Token, TokenPattern,
+    ExtensionDefinition, Head, Language, Lexeme, Matcher, MorphAnalysis, PatternValue,
+    PhraseMatcher, SpanPattern, SpanRuler, Token, TokenPattern, Vectors,
 };
 use serde_json::json;
 
@@ -763,4 +763,145 @@ fn test_morph_analysis_dict() {
     // Check that Number=Plur (or similar) is present for plural nouns
     let features = morph.features().unwrap();
     assert!(!features.is_empty());
+}
+
+// === Tier 5 Phase 1+2: Vectors, Lexeme, SpanRuler ===
+
+#[test]
+fn test_vectors_create_and_add() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    assert_eq!(vectors.shape().unwrap(), (10, 4));
+    assert!(vectors.is_empty().unwrap());
+
+    let row = vectors
+        .add("hello", Some(&[1.0, 2.0, 3.0, 4.0]), None)
+        .unwrap();
+    assert!(row < 10);
+    let hash = vocab.strings().unwrap().get_hash("hello").unwrap();
+    assert!(vectors.contains(hash).unwrap());
+    assert_eq!(vectors.keys().unwrap().len(), 1);
+}
+
+#[test]
+fn test_vectors_get_and_find() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    let vec = vec![1.0f32, 2.0, 3.0, 4.0];
+    vectors.add("hello", Some(&vec), None).unwrap();
+
+    let got = vectors.get("hello").unwrap();
+    assert_eq!(got.len(), 4);
+    assert!((got[0] - 1.0).abs() < 1e-6);
+
+    let row = vectors.find(Some("hello"), None).unwrap();
+    assert!(row >= 0);
+
+    let key = vectors.find(None, Some(row as usize)).unwrap();
+    assert!(key >= 0);
+}
+
+#[test]
+fn test_vectors_most_similar() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    vectors.add("a", Some(&[1.0, 0.0, 0.0, 0.0]), None).unwrap();
+    vectors.add("b", Some(&[0.9, 0.1, 0.0, 0.0]), None).unwrap();
+    vectors.add("c", Some(&[0.0, 1.0, 0.0, 0.0]), None).unwrap();
+
+    let queries = vec![vec![1.0f32, 0.0, 0.0, 0.0]];
+    let (keys, _rows, scores) = vectors.most_similar(&queries, 2, 1024).unwrap();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0].len(), 2);
+    assert_eq!(scores.len(), 1);
+    assert_eq!(scores[0].len(), 2);
+    // The query itself should be the most similar
+    assert!(scores[0][0] >= scores[0][1]);
+}
+
+#[test]
+fn test_vectors_roundtrip_bytes() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    vectors
+        .add("hello", Some(&[1.0, 2.0, 3.0, 4.0]), None)
+        .unwrap();
+
+    let bytes = vectors.to_bytes().unwrap();
+    let vectors2 = Vectors::from_bytes(&vocab, &bytes).unwrap();
+    let hash = vocab.strings().unwrap().get_hash("hello").unwrap();
+    assert!(vectors2.contains(hash).unwrap());
+    let got = vectors2.get("hello").unwrap();
+    assert!((got[0] - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_token_lexeme() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apples are tasty.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let apples = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Apples")
+        .unwrap();
+    let lexeme = apples.lexeme().unwrap();
+    assert_eq!(lexeme.orth_().unwrap(), "Apples");
+    let prob = lexeme.prob().unwrap();
+    assert!(prob.is_finite());
+}
+
+#[test]
+fn test_vocab_vectors() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = vocab.vectors().unwrap();
+    // en_core_web_sm has no vectors by default
+    let _shape = vectors.shape().unwrap();
+}
+
+#[test]
+fn test_span_ruler_phrase_pattern() {
+    let nlp = get_nlp();
+    let ruler = SpanRuler::new(&nlp, Some("ruler"), false, false, true, None).unwrap();
+    let patterns = vec![SpanPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let doc = nlp.nlp("Apple is great.").unwrap();
+    let doc = ruler.call(&doc).unwrap();
+    let spans = doc.spans().unwrap();
+    let group = spans.get("ruler").unwrap().unwrap();
+    assert_eq!(group.len().unwrap(), 1);
+    assert_eq!(group.get(0).unwrap().text().unwrap(), "Apple");
+    assert_eq!(group.get(0).unwrap().label_().unwrap(), "ORG");
+}
+
+#[test]
+fn test_span_ruler_annotate_ents() {
+    let nlp = get_nlp();
+    let ruler = SpanRuler::new(&nlp, None, true, false, true, None).unwrap();
+    let patterns = vec![SpanPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let doc = nlp.nlp("Apple is great.").unwrap();
+    let doc = ruler.call(&doc).unwrap();
+    let ents = doc.ents().unwrap();
+    assert!(ents
+        .iter()
+        .any(|e| { e.text().unwrap() == "Apple" && e.label_().unwrap() == "ORG" }));
+}
+
+#[test]
+fn test_span_ruler_bytes_roundtrip() {
+    let nlp = get_nlp();
+    let ruler = SpanRuler::new(&nlp, None, false, false, true, None).unwrap();
+    let patterns = vec![SpanPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let bytes = ruler.to_bytes().unwrap();
+    ruler.from_bytes(&bytes).unwrap();
+    assert_eq!(ruler.len().unwrap(), 1);
 }
