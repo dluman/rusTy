@@ -63,6 +63,23 @@ impl SpanGroups {
             Ok(contains)
         })
     }
+
+    /// Safely remove a span at `index` from the named group.
+    ///
+    /// This rebuilds the group via a Python list rather than calling spaCy's
+    /// broken `SpanGroup.__delitem__` (off-by-one / heap-corruption bug).
+    pub fn remove_span(&self, name: &str, index: usize) -> Result<(), SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let builtins = py.import_bound("builtins")?;
+            let list = builtins.getattr("list")?;
+            let group = obj.get_item(name)?;
+            let spans = list.call1((group,))?;
+            spans.call_method1("__delitem__", (index,))?;
+            obj.set_item(name, spans)?;
+            Ok(())
+        })
+    }
 }
 
 impl SpanGroup {
@@ -101,14 +118,6 @@ impl SpanGroup {
         with_gil(|py| {
             let obj = self.obj.bind(py);
             obj.call_method1("__setitem__", (index, span.obj.bind(py)))?;
-            Ok(())
-        })
-    }
-
-    pub fn remove(&self, index: usize) -> Result<(), SpaCyError> {
-        with_gil(|py| {
-            let obj = self.obj.bind(py);
-            obj.call_method1("__delitem__", (index,))?;
             Ok(())
         })
     }

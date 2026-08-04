@@ -244,6 +244,7 @@ assert_eq!(group.len()?, doc.ents()?.len());
 |--------|-------------|
 | `get(name)` | Get a `SpanGroup` by name |
 | `set(name, spans)` | Assign a list of `Span`s to a name |
+| `remove_span(name, index)` | Safely remove a span by rebuilding the group |
 | `names()` | List all group names |
 | `has(name)` | Check if a group exists |
 
@@ -252,10 +253,12 @@ assert_eq!(group.len()?, doc.ents()?.len());
 |--------|-------------|
 | `len()` / `is_empty()` | Number of spans |
 | `spans()` | Get all spans |
-| `get(index)` / `set(index, span)` / `remove(index)` | Index access |
+| `get(index)` / `set(index, span)` | Index access |
 | `append(span)` / `extend(spans)` | Add spans |
 | `has_overlap()` | Check for overlapping spans |
 | `copy()` | Return a copy |
+
+> **Note:** `SpanGroup::remove` is intentionally absent because spaCy's `SpanGroup.__delitem__` contains an off-by-one bug that corrupts the heap. Use `SpanGroups::remove_span` instead.
 
 ## Similarity Example
 

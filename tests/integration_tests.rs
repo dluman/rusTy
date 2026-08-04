@@ -403,6 +403,15 @@ fn test_span_groups() {
         spans.set("ents", &[ents[0].clone()]).unwrap();
         let group = spans.get("ents").unwrap().unwrap();
         assert_eq!(group.len().unwrap(), 1);
+
+        // append is safe
+        group.append(&ents[0]).unwrap();
+        assert_eq!(group.len().unwrap(), 2);
+
+        // remove_span rebuilds the group safely (avoids spaCy __delitem__ bug)
+        spans.remove_span("ents", 0).unwrap();
+        let group = spans.get("ents").unwrap().unwrap();
+        assert_eq!(group.len().unwrap(), 1);
     }
 }
 
