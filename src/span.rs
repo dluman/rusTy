@@ -95,6 +95,10 @@ impl Span {
         self.get_attr("has_vector")
     }
 
+    pub fn vector_norm(&self) -> Result<f64, SpaCyError> {
+        self.get_attr("vector_norm")
+    }
+
     pub fn similarity(&self, other: &Span) -> Result<f64, SpaCyError> {
         with_gil(|py| {
             let obj = self.obj.bind(py);

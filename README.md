@@ -98,8 +98,15 @@ Represents a processed document.
 | `noun_chunks()` | Noun chunks (as `Span`s) |
 | `char_span(start, end, label, kb_id, alignment_mode)` | Create `Span` from character offsets |
 | `vector()` | Document vector (`Vec<f32>`) |
+| `vector_norm()` | L2 norm of the document vector |
 | `has_vector()` | Check if vector exists |
 | `similarity(other)` | Cosine similarity with another `Doc` |
+| `vocab()` | Access the document's `Vocab` |
+| `cats()` | Text categorization scores (`HashMap<String, f64>`) |
+| `has_annotation(attr, require_complete)` | Check if annotation is present |
+| `count_by(attr_id)` | Attribute frequency counts |
+| `retokenize()` | Returns a `RetokenizerGuard` for merge/split |
+| `spans()` | Access named span groups (`SpanGroups`) |
 | `to_json()` | Export as JSON (`serde_json::Value`) |
 | `to_bytes()` | Serialize to bytes |
 | `from_bytes(lang, bytes)` | Deserialize from bytes |
@@ -139,6 +146,7 @@ Represents a contiguous slice of tokens.
 | `sent()` | Containing sentence |
 | `doc()` | Parent document |
 | `vector()` | Span vector |
+| `vector_norm()` | L2 norm of the span vector |
 | `has_vector()` | Check if vector exists |
 | `similarity(other)` | Similarity with another `Span` |
 | `as_doc()` | Convert span to a standalone `Doc` |
@@ -151,6 +159,106 @@ Represents a contiguous slice of tokens.
 | `strings.add(string)` | Add a string, get its hash |
 | `strings.get_hash(string)` | Get hash for a string |
 | `strings.get_string(hash)` | Look up string by hash |
+
+### `Matcher`
+
+spaCy's rule-based `Matcher` for finding token sequences.
+
+```rust
+use rusty::{Matcher, PatternValue, TokenPattern};
+
+let vocab = doc.vocab()?;
+let matcher = Matcher::new(&vocab, false)?;
+matcher.add("GREETING", vec![
+    TokenPattern::new().orth("Hello").is_punct(false),
+])?;
+let matches = matcher.call(&doc)?;
+for m in &matches {
+    println!("match {:?} at {}..{}", m.id, m.start, m.end);
+}
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(vocab, validate)` | Create a `Matcher` |
+| `add(name, patterns)` | Add a pattern (one `Vec<TokenPattern>`) |
+| `add_raw(name, json)` | Add a raw JSON pattern string |
+| `call(doc)` | Find matches, returns `Vec<Match>` |
+| `call_as_spans(doc)` | Find matches, returns `Vec<Span>` |
+| `len()` | Number of rules |
+| `is_empty()` | Whether no rules are registered |
+| `contains(name)` | Check if rule exists |
+| `remove(name)` | Remove a rule |
+
+### `PhraseMatcher`
+
+Efficient phrase-list matching using `Doc` objects as patterns.
+
+```rust
+use rusty::PhraseMatcher;
+
+let vocab = doc.vocab()?;
+let pattern_doc = nlp.nlp("Hello")?;
+let matcher = PhraseMatcher::new(&vocab, None, false)?;
+matcher.add("GREETING", &[pattern_doc])?;
+let matches = matcher.call(&doc)?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(vocab, attr, validate)` | Create a `PhraseMatcher` (`attr`: e.g. `"ORTH"`, `"LOWER"`) |
+| `add(name, docs)` | Add `Doc` objects as patterns |
+| `call(doc)` / `call_as_spans(doc)` | Find matches |
+| `len()` / `is_empty()` / `contains(name)` / `remove(name)` | Same as `Matcher` |
+
+### `RetokenizerGuard`
+
+RAII guard around `Doc.retokenize()`. On drop, all pending changes are applied.
+
+```rust
+let mut span = doc.char_span(0, 8, None, None, None)?.unwrap();
+{
+    let mut retokenizer = doc.retokenize()?;
+    retokenizer.merge(&span, None)?;
+} // merged token is persisted
+```
+
+| Method | Description |
+|--------|-------------|
+| `merge(span, attrs_json)` | Merge tokens in `span` into one token |
+| `split(token, orths, heads, attrs_json)` | Split `token` into subtokens |
+
+### `SpanGroups` & `SpanGroup`
+
+Named groups of potentially overlapping spans.
+
+```rust
+let spans = doc.spans()?;
+spans.set("ents", &doc.ents()?)?;
+let group = spans.get("ents")?.unwrap();
+assert_eq!(group.len()?, doc.ents()?.len());
+```
+
+**SpanGroups:**
+| Method | Description |
+|--------|-------------|
+| `get(name)` | Get a `SpanGroup` by name |
+| `set(name, spans)` | Assign a list of `Span`s to a name |
+| `remove_span(name, index)` | Safely remove a span by rebuilding the group |
+| `names()` | List all group names |
+| `has(name)` | Check if a group exists |
+
+**SpanGroup:**
+| Method | Description |
+|--------|-------------|
+| `len()` / `is_empty()` | Number of spans |
+| `spans()` | Get all spans |
+| `get(index)` / `set(index, span)` | Index access |
+| `append(span)` / `extend(spans)` | Add spans |
+| `has_overlap()` | Check for overlapping spans |
+| `copy()` | Return a copy |
+
+> **Note:** `SpanGroup::remove` is intentionally absent because spaCy's `SpanGroup.__delitem__` contains an off-by-one bug that corrupts the heap. Use `SpanGroups::remove_span` instead.
 
 ## Similarity Example
 

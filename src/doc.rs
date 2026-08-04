@@ -1,8 +1,9 @@
 use crate::utils::{extract_vec_f32, with_gil};
-use crate::{Language, SpaCyError, Span, Token};
+use crate::{Language, RetokenizerGuard, SpaCyError, Span, SpanGroups, Token, Vocab};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyDictMethods};
 use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Doc {
@@ -151,6 +152,82 @@ impl Doc {
 
     pub fn lang(&self) -> Result<String, SpaCyError> {
         self.get_attr("lang")
+    }
+
+    pub fn vocab(&self) -> Result<Vocab, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let vocab = obj.getattr("vocab")?;
+            Ok(Vocab::new(vocab.into()))
+        })
+    }
+
+    pub fn retokenize(&self) -> Result<RetokenizerGuard, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let retokenizer = obj.call_method0("retokenize")?;
+            retokenizer.call_method0("__enter__")?;
+            Ok(RetokenizerGuard::new(retokenizer.into()))
+        })
+    }
+
+    pub fn spans(&self) -> Result<SpanGroups, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let spans = obj.getattr("spans")?;
+            Ok(SpanGroups {
+                obj: spans.into(),
+                doc: self.obj.clone(),
+            })
+        })
+    }
+
+    pub fn cats(&self) -> Result<HashMap<String, f64>, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let cats = obj.getattr("cats")?;
+            let items = cats.call_method0("items")?;
+            let mut result = HashMap::new();
+            for item in items.iter()? {
+                let item = item?;
+                let key: String = item.call_method1("__getitem__", (0,))?.extract()?;
+                let value: f64 = item.call_method1("__getitem__", (1,))?.extract()?;
+                result.insert(key, value);
+            }
+            Ok(result)
+        })
+    }
+
+    pub fn vector_norm(&self) -> Result<f64, SpaCyError> {
+        self.get_attr("vector_norm")
+    }
+
+    pub fn has_annotation(&self, attr: &str, require_complete: bool) -> Result<bool, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let kwargs = PyDict::new_bound(py);
+            kwargs.set_item("require_complete", require_complete)?;
+            let result: bool = obj
+                .call_method("has_annotation", (attr,), Some(&kwargs))?
+                .extract()?;
+            Ok(result)
+        })
+    }
+
+    pub fn count_by(&self, attr_id: u64) -> Result<HashMap<u64, i64>, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let counts = obj.call_method1("count_by", (attr_id,))?;
+            let items = counts.call_method0("items")?;
+            let mut result = HashMap::new();
+            for item in items.iter()? {
+                let item = item?;
+                let key: u64 = item.call_method1("__getitem__", (0,))?.extract()?;
+                let value: i64 = item.call_method1("__getitem__", (1,))?.extract()?;
+                result.insert(key, value);
+            }
+            Ok(result)
+        })
     }
 
     pub fn to_json(&self) -> Result<Value, SpaCyError> {
