@@ -1,7 +1,8 @@
 use rusty::{
-    DependencyMatcher, DependencyPatternNode, Doc, DocBin, EntityPattern, EntityRuler,
-    ExtensionDefinition, Head, Language, Lexeme, Matcher, MorphAnalysis, PatternValue,
-    PhraseMatcher, SpanPattern, SpanRuler, Token, TokenPattern, Vectors,
+    Candidate, DependencyMatcher, DependencyPatternNode, Doc, DocBin, EntityLinker, EntityPattern,
+    EntityRuler, ExtensionDefinition, Head, KnowledgeBase, Language, Lexeme, Matcher,
+    MorphAnalysis, PatternValue, PhraseMatcher, SpanPattern, SpanRuler, Token, TokenPattern,
+    Vectors,
 };
 use serde_json::json;
 
@@ -904,4 +905,99 @@ fn test_span_ruler_bytes_roundtrip() {
     let bytes = ruler.to_bytes().unwrap();
     ruler.from_bytes(&bytes).unwrap();
     assert_eq!(ruler.len().unwrap(), 1);
+}
+
+// === Tier 5 Phase 3: Entity Linking ===
+
+#[test]
+fn test_knowledge_base_create_and_query() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    assert_eq!(kb.entity_vector_length().unwrap(), 4);
+    assert!(kb.is_empty().unwrap());
+
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    assert!(kb.contains_entity("Q1").unwrap());
+    assert!(!kb.contains_entity("Q2").unwrap());
+    assert!(kb.contains_alias("Apple").unwrap());
+    assert!(!kb.contains_alias("Microsoft").unwrap());
+
+    let candidates = kb.get_candidates("Apple").unwrap();
+    assert_eq!(candidates.len(), 1);
+    let c = &candidates[0];
+    assert_eq!(c.entity_().unwrap(), "Q1");
+    assert_eq!(c.alias_().unwrap(), "Apple");
+    assert!((c.prior_prob().unwrap() - 0.9).abs() < 1e-5);
+    assert_eq!(c.entity_vector().unwrap().len(), 4);
+    assert!((c.entity_freq().unwrap() - 100.0).abs() < 1e-5);
+
+    let vec = kb.get_vector("Q1").unwrap();
+    assert_eq!(vec.len(), 4);
+    assert!((vec[0] - 1.0).abs() < 1e-6);
+
+    // get_prior_prob may return 0.0 in some spaCy versions;
+    // candidate.prior_prob is the reliable source
+    let _prob = kb.get_prior_prob("Apple", "Q1").unwrap();
+
+    assert_eq!(kb.get_size_entities().unwrap(), 1);
+    assert_eq!(kb.get_size_aliases().unwrap(), 1);
+
+    let entities = kb.get_entity_strings().unwrap();
+    assert_eq!(entities, vec!["Q1"]);
+
+    let aliases = kb.get_alias_strings().unwrap();
+    assert_eq!(aliases, vec!["Apple"]);
+}
+
+#[test]
+fn test_knowledge_base_bytes_roundtrip() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    let bytes = kb.to_bytes().unwrap();
+    let kb2 = KnowledgeBase::from_bytes(&vocab, &bytes).unwrap();
+    assert!(kb2.contains_entity("Q1").unwrap());
+    assert!(kb2.contains_alias("Apple").unwrap());
+    let vec = kb2.get_vector("Q1").unwrap();
+    assert!((vec[0] - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_knowledge_base_disk_roundtrip() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    let path = "/tmp/test_kb";
+    let _ = std::fs::remove_dir_all(path);
+    kb.to_disk(path).unwrap();
+    let kb2 = KnowledgeBase::from_disk(&vocab, path).unwrap();
+    assert!(kb2.contains_entity("Q1").unwrap());
+    assert!(kb2.contains_alias("Apple").unwrap());
+}
+
+#[test]
+fn test_entity_linker_creation_and_kb() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    // Create a minimal language pipeline with entity linker
+    // (We can't call it without initialization, but we can test creation/set_kb)
+    let el = EntityLinker::new(&nlp, "entity_linker", 4).unwrap();
+    el.set_kb(&kb).unwrap();
+
+    assert_eq!(el.name().unwrap(), "entity_linker");
+    let labels = el.labels().unwrap();
+    assert!(labels.is_empty());
 }

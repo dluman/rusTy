@@ -378,6 +378,68 @@ for ent in doc.ents()? {
 | `to_bytes()` / `from_bytes(bytes)` | Byte serialization |
 | `to_disk(path)` / `from_disk(path)` | Disk serialization |
 
+### `KnowledgeBase` & `Candidate`
+
+In-memory knowledge base for entity linking. Entities have vectors and surface-form aliases map to candidates.
+
+```rust
+use rusty::{KnowledgeBase, EntityLinker};
+
+let kb = KnowledgeBase::new(&vocab, 4)?;
+kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0])?;
+kb.add_alias("Apple", &["Q1"], &[0.9])?;
+
+let candidates = kb.get_candidates("Apple")?;
+for c in &candidates {
+    println!("{} -> {} (prob: {})", c.alias_()?, c.entity_()?, c.prior_prob()?);
+}
+```
+
+**KnowledgeBase:**
+| Method | Description |
+|--------|-------------|
+| `new(vocab, entity_vector_length)` | Create an empty `InMemoryLookupKB` |
+| `add_entity(entity, freq, vector)` | Add an entity with a vector |
+| `add_alias(alias, entities, probabilities)` | Add a surface-form alias |
+| `contains_entity(entity)` / `contains_alias(alias)` | Existence checks |
+| `get_candidates(alias)` | Get `Candidate`s for an alias |
+| `get_vector(entity)` | Retrieve entity vector |
+| `get_prior_prob(alias, entity)` | Alias→entity prior probability |
+| `entity_vector_length()` | Vector dimensionality |
+| `is_empty()` / `get_size_entities()` / `get_size_aliases()` | Size queries |
+| `get_entity_strings()` / `get_alias_strings()` | All keys |
+| `to_bytes()` / `from_bytes(vocab, bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(vocab, path)` | Disk serialization |
+
+**Candidate:**
+| Method | Description |
+|--------|-------------|
+| `entity_()` / `alias_()` | String IDs |
+| `prior_prob()` | Probability |
+| `entity_vector()` | Entity vector |
+| `entity_freq()` | Entity frequency |
+
+### `EntityLinker`
+
+Pipeline component for linking named entities to a `KnowledgeBase`. Must be initialized before running inference.
+
+```rust
+let el = EntityLinker::new(&nlp, "entity_linker", 4)?;
+el.set_kb(&kb)?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(language, name, entity_vector_length)` | Create and add to pipeline |
+| `from_pipe(language, name)` | Retrieve existing linker |
+| `set_kb(knowledge_base)` | Attach a `KnowledgeBase` |
+| `call(doc)` | Process a `Doc` (requires init) |
+| `labels()` | Configured labels |
+| `cfg()` | Component config as JSON |
+| `name()` | Component name |
+| `to_bytes()` / `from_bytes(language, name, bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(language, name, path)` | Disk serialization |
+
 ### `SpanGroups` & `SpanGroup`
 
 Named groups of potentially overlapping spans.
