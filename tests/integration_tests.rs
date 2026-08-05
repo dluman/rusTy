@@ -1,8 +1,8 @@
 use rusty::{
-    Candidate, DependencyMatcher, DependencyPatternNode, Doc, DocBin, EntityLinker, EntityPattern,
-    EntityRuler, ExtensionDefinition, Head, KnowledgeBase, Language, Lexeme, Matcher,
-    MorphAnalysis, PatternValue, PhraseMatcher, SpanPattern, SpanRuler, Token, TokenPattern,
-    Vectors,
+    offsets_to_biluo_tags, Candidate, DependencyMatcher, DependencyPatternNode, Doc, DocBin,
+    EntityLinker, EntityPattern, EntityRuler, Example, ExtensionDefinition, Head, KnowledgeBase,
+    Language, Lexeme, Matcher, MorphAnalysis, PatternValue, PhraseMatcher, SpanPattern, SpanRuler,
+    Token, TokenPattern, Vectors,
 };
 use serde_json::json;
 
@@ -1000,4 +1000,79 @@ fn test_entity_linker_creation_and_kb() {
     assert_eq!(el.name().unwrap(), "entity_linker");
     let labels = el.labels().unwrap();
     assert!(labels.is_empty());
+}
+
+// === Tier 5 Phase 4: Training Utilities ===
+
+#[test]
+fn test_example_from_dict() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying U.K. startup.").unwrap();
+    // Use a single aligned entity to avoid misalignment issues
+    let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+    let example = Example::from_dict(&doc, annotations).unwrap();
+
+    assert_eq!(
+        example.text().unwrap(),
+        "Apple is looking at buying U.K. startup."
+    );
+
+    let predicted = example.predicted().unwrap();
+    assert_eq!(
+        predicted.text().unwrap(),
+        "Apple is looking at buying U.K. startup."
+    );
+
+    let reference = example.reference().unwrap();
+    assert_eq!(
+        reference.text().unwrap(),
+        "Apple is looking at buying U.K. startup."
+    );
+
+    let tags = example.get_aligned_ner().unwrap();
+    assert_eq!(tags.len(), 8); // 8 tokens
+    assert_eq!(tags[0], "U-ORG");
+
+    let dict = example.to_dict().unwrap();
+    assert!(dict.get("doc_annotation").is_some());
+}
+
+#[test]
+fn test_example_from_text_and_annotations() {
+    let nlp = get_nlp();
+    let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+    let example = Example::from_text_and_annotations(&nlp, "Apple is great.", annotations).unwrap();
+
+    assert_eq!(example.text().unwrap(), "Apple is great.");
+    let tags = example.get_aligned_ner().unwrap();
+    assert!(!tags.is_empty());
+    assert!(tags.iter().any(|t| t == "U-ORG"));
+}
+
+#[test]
+fn test_example_split_sents() {
+    let nlp = get_nlp();
+    let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+    let example = Example::from_text_and_annotations(&nlp, "Apple is great.", annotations).unwrap();
+
+    // split_sents returns one example per sentence; single-sentence docs return 1
+    let split = example.split_sents().unwrap();
+    assert!(!split.is_empty());
+    assert_eq!(split[0].text().unwrap(), "Apple is great.");
+}
+
+#[test]
+fn test_offsets_to_biluo_tags() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying U.K. startup.").unwrap();
+
+    let entities = vec![(0usize, 5usize, "ORG"), (27usize, 30usize, "GPE")];
+    let tags = offsets_to_biluo_tags(&doc, &entities).unwrap();
+    assert_eq!(tags.len(), 8); // 8 tokens
+
+    // First token should be U-ORG
+    assert_eq!(tags[0], "U-ORG");
+
+    // U.K. is token 5 (0-indexed), GPE at position 27-30
+    assert!(tags[5] == "U-GPE" || tags[5] == "B-GPE" || tags[5] == "-");
 }

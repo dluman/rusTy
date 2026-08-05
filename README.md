@@ -440,6 +440,45 @@ el.set_kb(&kb)?;
 | `to_bytes()` / `from_bytes(language, name, bytes)` | Byte serialization |
 | `to_disk(path)` / `from_disk(language, name, path)` | Disk serialization |
 
+### `Example`
+
+A training example pairing a predicted `Doc` with a reference `Doc` containing gold annotations.
+
+```rust
+use rusty::Example;
+
+let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+let example = Example::from_text_and_annotations(&nlp, "Apple is great.", annotations)?;
+
+let tags = example.get_aligned_ner()?;
+assert!(tags.iter().any(|t| t == "U-ORG"));
+```
+
+| Method | Description |
+|--------|-------------|
+| `from_dict(doc, annotations_json)` | Create from a `Doc` + JSON annotations |
+| `from_text_and_annotations(language, text, annotations_json)` | Create from text + annotations |
+| `predicted()` / `reference()` | Predicted and gold `Doc`s |
+| `text()` | Text of the example |
+| `to_dict()` | Export as spaCy annotation dict |
+| `get_aligned_ner()` | Aligned BILUO NER tags |
+| `split_sents()` | Split into one example per sentence |
+
+### `Training Utilities`
+
+Helper functions for preparing training data.
+
+```rust
+use rusty::offsets_to_biluo_tags;
+
+let doc = nlp.nlp("Apple is great.")?;
+let tags = offsets_to_biluo_tags(&doc, &[(0, 5, "ORG")])?;
+```
+
+| Function | Description |
+|----------|-------------|
+| `offsets_to_biluo_tags(doc, entities)` | Convert `(start, end, label)` offsets to BILUO tags |
+
 ### `SpanGroups` & `SpanGroup`
 
 Named groups of potentially overlapping spans.
