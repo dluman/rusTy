@@ -1,4 +1,6 @@
 pub mod doc;
+pub mod doc_bin;
+pub mod entity_ruler;
 pub mod error;
 pub mod language;
 pub mod matcher;
@@ -10,6 +12,8 @@ pub mod utils;
 pub mod vocab;
 
 pub use doc::Doc;
+pub use doc_bin::DocBin;
+pub use entity_ruler::{EntityPattern, EntityPatternValue, EntityRuler};
 pub use error::SpaCyError;
 pub use language::Language;
 pub use matcher::{Match, Matcher, PatternValue, PhraseMatcher, TokenPattern};

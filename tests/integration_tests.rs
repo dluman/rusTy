@@ -1,4 +1,7 @@
-use rusty::{Head, Language, Matcher, PatternValue, PhraseMatcher, TokenPattern};
+use rusty::{
+    Doc, DocBin, EntityPattern, EntityRuler, Head, Language, Matcher, PatternValue, PhraseMatcher,
+    TokenPattern,
+};
 
 fn get_nlp() -> Language {
     Language::load("en_core_web_sm").expect(
@@ -458,4 +461,125 @@ fn test_count_by() {
     // spaCy POS attribute ID = 74
     let counts = doc.count_by(74).unwrap();
     assert!(!counts.is_empty());
+}
+
+// === Tier 3: Token vectors, DocBin, EntityRuler ===
+
+#[test]
+fn test_token_vector_norm() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let token = doc.token(0).unwrap();
+    let norm = token.vector_norm().unwrap();
+    assert!(norm >= 0.0);
+}
+
+#[test]
+fn test_doc_bin_roundtrip_bytes() {
+    let nlp = get_nlp();
+    let doc1 = nlp.nlp("Hello world.").unwrap();
+    let doc2 = nlp.nlp("Foo bar.").unwrap();
+
+    let bin = DocBin::new(None, false).unwrap();
+    bin.add(&doc1).unwrap();
+    bin.add(&doc2).unwrap();
+    assert_eq!(bin.len().unwrap(), 2);
+    assert!(!bin.is_empty().unwrap());
+
+    let bytes = bin.to_bytes().unwrap();
+    let bin2 = DocBin::from_bytes(&bytes).unwrap();
+    assert_eq!(bin2.len().unwrap(), 2);
+
+    let vocab = nlp.vocab().unwrap();
+    let docs = bin2.get_docs(&vocab).unwrap();
+    assert_eq!(docs.len(), 2);
+    assert_eq!(docs[0].text().unwrap(), "Hello world.");
+    assert_eq!(docs[1].text().unwrap(), "Foo bar.");
+}
+
+#[test]
+fn test_doc_bin_roundtrip_disk() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let path = "/tmp/test_docbin.spacy";
+
+    let bin = DocBin::from_docs(None, false, &[doc]).unwrap();
+    bin.to_disk(path).unwrap();
+
+    let bin2 = DocBin::from_disk(path).unwrap();
+    assert_eq!(bin2.len().unwrap(), 1);
+
+    let vocab = nlp.vocab().unwrap();
+    let docs = bin2.get_docs(&vocab).unwrap();
+    assert_eq!(docs[0].text().unwrap(), "Hello world.");
+}
+
+#[test]
+fn test_doc_to_disk_from_disk() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let path = "/tmp/test_doc_dir";
+
+    doc.to_disk(path).unwrap();
+    let doc2 = Doc::from_disk(&nlp, path).unwrap();
+    assert_eq!(doc2.text().unwrap(), "Hello world.");
+}
+
+#[test]
+fn test_doc_from_json() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Hello world.").unwrap();
+    let json = doc.to_json().unwrap();
+    let doc2 = Doc::from_json(&nlp, &json).unwrap();
+    assert_eq!(doc2.text().unwrap(), "Hello world.");
+}
+
+#[test]
+fn test_entity_ruler_phrase_pattern() {
+    let nlp = get_nlp();
+    let ruler = EntityRuler::new(&nlp, None, false, false, None).unwrap();
+    let patterns = vec![EntityPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    assert_eq!(ruler.len().unwrap(), 1);
+    assert!(ruler.contains("ORG").unwrap());
+    let labels = ruler.labels().unwrap();
+    assert!(labels.contains(&"ORG".to_string()));
+
+    let doc = nlp.nlp("Apple is great.").unwrap();
+    let doc = ruler.call(&doc).unwrap();
+    let ents = doc.ents().unwrap();
+    assert!(ents
+        .iter()
+        .any(|e| { e.text().unwrap() == "Apple" && e.label_().unwrap() == "ORG" }));
+}
+
+#[test]
+fn test_entity_ruler_token_pattern() {
+    let nlp = get_nlp();
+    let ruler = EntityRuler::new(&nlp, None, false, false, None).unwrap();
+    let patterns = vec![EntityPattern::tokens(
+        "ORG",
+        vec![TokenPattern::new().lower("apple")],
+    )];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let doc = nlp.nlp("apple is great.").unwrap();
+    let doc = ruler.call(&doc).unwrap();
+    let ents = doc.ents().unwrap();
+    assert!(ents
+        .iter()
+        .any(|e| { e.text().unwrap() == "apple" && e.label_().unwrap() == "ORG" }));
+}
+
+#[test]
+fn test_entity_ruler_bytes_roundtrip() {
+    let nlp = get_nlp();
+    let ruler = EntityRuler::new(&nlp, None, false, false, None).unwrap();
+    let patterns = vec![EntityPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let bytes = ruler.to_bytes().unwrap();
+    ruler.from_bytes(&bytes).unwrap();
+    assert_eq!(ruler.len().unwrap(), 1);
 }

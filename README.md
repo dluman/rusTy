@@ -19,7 +19,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rusty = "0.5"
+rusty = "0.6"
 ```
 
 ## Quick Start
@@ -108,8 +108,11 @@ Represents a processed document.
 | `retokenize()` | Returns a `RetokenizerGuard` for merge/split |
 | `spans()` | Access named span groups (`SpanGroups`) |
 | `to_json()` | Export as JSON (`serde_json::Value`) |
+| `from_json(lang, json)` | Import from JSON |
 | `to_bytes()` | Serialize to bytes |
 | `from_bytes(lang, bytes)` | Deserialize from bytes |
+| `to_disk(path)` | Save `Doc` to disk |
+| `from_disk(lang, path)` | Load `Doc` from disk |
 
 ### `Token`
 
@@ -125,7 +128,7 @@ Represents a single token.
 
 **Flags:** `is_alpha()`, `is_ascii()`, `is_digit()`, `is_lower()`, `is_upper()`, `is_title()`, `is_punct()`, `is_space()`, `is_stop()`, `like_num()`, `like_email()`, `like_url()`
 
-**Vectors:** `vector()`, `has_vector()`, `similarity(other)`
+**Vectors:** `vector()`, `vector_norm()`, `has_vector()`, `similarity(other)`
 
 **Context:** `idx()`, `sent()`, `doc()`
 
@@ -227,6 +230,67 @@ let mut span = doc.char_span(0, 8, None, None, None)?.unwrap();
 |--------|-------------|
 | `merge(span, attrs_json)` | Merge tokens in `span` into one token |
 | `split(token, orths, heads, attrs_json)` | Split `token` into subtokens |
+
+### `DocBin`
+
+Efficient binary serializer for collections of `Doc` objects. Produces smaller files than pickle and deserializes without executing arbitrary code.
+
+```rust
+use rusty::DocBin;
+
+let docs = vec![nlp.nlp("Hello.")?, nlp.nlp("World.")?];
+let bin = DocBin::from_docs(None, false, &docs)?;
+let bytes = bin.to_bytes()?;
+
+// Later…
+let bin2 = DocBin::from_bytes(&bytes)?;
+let recovered = bin2.get_docs(&nlp.vocab()?)?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(attrs, store_user_data)` | Create an empty `DocBin` |
+| `from_docs(attrs, store_user_data, docs)` | Create and populate in one call |
+| `add(doc)` | Add a `Doc` |
+| `len()` / `is_empty()` | Number of stored docs |
+| `merge(other)` | Merge another `DocBin` into this one |
+| `to_bytes()` / `from_bytes(bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(path)` | Disk serialization (`.spacy` extension) |
+| `get_docs(vocab)` | Recover `Doc` objects |
+
+### `EntityRuler`
+
+Pipeline component for rule-based named entity recognition. Can be used alone or combined with the statistical `EntityRecognizer`.
+
+```rust
+use rusty::{EntityRuler, EntityPattern, TokenPattern};
+
+let ruler = EntityRuler::new(&nlp, None, false, false, None)?;
+let patterns = vec![
+    EntityPattern::phrase("ORG", "Apple"),
+    EntityPattern::tokens("ORG", vec![TokenPattern::new().lower("apple")]),
+];
+ruler.add_patterns(&patterns)?;
+
+let doc = ruler.call(&nlp.nlp("Apple is great.")?)?;
+for ent in doc.ents()? {
+    println!("{} -> {}", ent.text()?, ent.label_()?);
+}
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(language, phrase_matcher_attr, validate, overwrite_ents, patterns)` | Create an `EntityRuler` |
+| `add_patterns(patterns)` | Add typed patterns |
+| `add_patterns_raw(json)` | Add raw JSON patterns |
+| `call(doc)` | Process a `Doc` and add matches to `doc.ents` |
+| `labels()` | All labels in the patterns |
+| `ent_ids()` | All entity IDs in the patterns |
+| `patterns()` | All patterns as `serde_json::Value` |
+| `contains(label)` | Check if a label exists |
+| `len()` / `is_empty()` | Number of patterns |
+| `to_bytes()` / `from_bytes(bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(path)` | Disk serialization |
 
 ### `SpanGroups` & `SpanGroup`
 
