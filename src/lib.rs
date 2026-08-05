@@ -1,9 +1,12 @@
+pub mod dependency_matcher;
 pub mod doc;
 pub mod doc_bin;
 pub mod entity_ruler;
 pub mod error;
+pub mod extensions;
 pub mod language;
 pub mod matcher;
+pub mod morph;
 pub mod retokenizer;
 pub mod span;
 pub mod span_group;
@@ -11,12 +14,15 @@ pub mod token;
 pub mod utils;
 pub mod vocab;
 
+pub use dependency_matcher::{DependencyMatch, DependencyMatcher, DependencyPatternNode};
 pub use doc::Doc;
 pub use doc_bin::DocBin;
 pub use entity_ruler::{EntityPattern, EntityPatternValue, EntityRuler};
 pub use error::SpaCyError;
+pub use extensions::{ExtensionDefinition, ExtensionInfo};
 pub use language::Language;
 pub use matcher::{Match, Matcher, PatternValue, PhraseMatcher, TokenPattern};
+pub use morph::MorphAnalysis;
 pub use retokenizer::{Head, RetokenizerGuard};
 pub use span::Span;
 pub use span_group::{SpanGroup, SpanGroups};

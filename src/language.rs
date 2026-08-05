@@ -133,6 +133,77 @@ impl Language {
         })
     }
 
+    pub fn replace_pipe(
+        &self,
+        name: &str,
+        factory_name: &str,
+        config: Option<&str>,
+    ) -> Result<(), SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let kwargs = PyDict::new_bound(py);
+            if let Some(cfg) = config {
+                let cfg_dict: Bound<'_, PyDict> = py
+                    .import_bound("json")?
+                    .getattr("loads")?
+                    .call1((cfg,))?
+                    .extract()?;
+                for (key, value) in &cfg_dict {
+                    kwargs.set_item(key, value)?;
+                }
+            }
+            obj.call_method("replace_pipe", (name, factory_name), Some(&kwargs))?;
+            Ok(())
+        })
+    }
+
+    pub fn rename_pipe(&self, old_name: &str, new_name: &str) -> Result<(), SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            obj.call_method1("rename_pipe", (old_name, new_name))?;
+            Ok(())
+        })
+    }
+
+    pub fn pipe_names(&self) -> Result<Vec<String>, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let names: Vec<String> = obj.getattr("pipe_names")?.extract()?;
+            Ok(names)
+        })
+    }
+
+    pub fn pipeline(&self) -> Result<Vec<(String, Py<PyAny>)>, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let pipeline = obj.getattr("pipeline")?;
+            let mut result = Vec::new();
+            for item in pipeline.iter()? {
+                let item = item?;
+                let tuple = match item.downcast::<pyo3::types::PyTuple>() {
+                    Ok(t) => t,
+                    Err(e) => return Err(SpaCyError::Python(format!("Downcast error: {}", e))),
+                };
+                let name: String = tuple.get_item(0)?.extract()?;
+                let component = tuple.get_item(1)?.into();
+                result.push((name, component));
+            }
+            Ok(result)
+        })
+    }
+
+    pub fn disabled(&self) -> Result<Vec<String>, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let disabled = obj.getattr("disabled")?;
+            let mut result = Vec::new();
+            for name in disabled.iter()? {
+                result.push(name?.extract()?);
+            }
+            Ok(result)
+        })
+    }
+
     pub fn from_disk(path: &str) -> Result<Self, SpaCyError> {
         with_gil(|py| {
             let spacy = py.import_bound("spacy")?;

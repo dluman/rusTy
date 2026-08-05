@@ -77,8 +77,13 @@ Represents a loaded spaCy language model.
 | `pipe(texts)` | Batch process multiple texts |
 | `vocab()` | Access the model's `Vocab` |
 | `component_names()` | List pipeline component names |
+| `pipe_names()` | List active pipeline component names |
+| `pipeline()` | Active pipeline as `(name, component)` tuples |
+| `disabled()` | Names of currently disabled components |
 | `add_pipe(name, config, last)` | Add a pipeline component |
 | `remove_pipe(name)` | Remove a pipeline component |
+| `replace_pipe(name, factory, config)` | Replace a pipeline component |
+| `rename_pipe(old, new)` | Rename a pipeline component |
 | `disable_pipes(names)` | Temporarily disable pipes (returns guard) |
 | `to_disk(path)` | Save model to disk |
 | `from_disk(path)` | Load model from disk |
@@ -323,6 +328,120 @@ assert_eq!(group.len()?, doc.ents()?.len());
 | `copy()` | Return a copy |
 
 > **Note:** `SpanGroup::remove` is intentionally absent because spaCy's `SpanGroup.__delitem__` contains an off-by-one bug that corrupts the heap. Use `SpanGroups::remove_span` instead.
+
+### Custom Extension Attributes
+
+Register custom attributes, properties, and methods on `Doc`, `Span`, and `Token` via the `._` namespace.
+
+```rust
+use rusty::{Doc, ExtensionDefinition};
+use serde_json::json;
+
+// Attribute extension
+Doc::set_extension(
+    "doc_id",
+    ExtensionDefinition::Attribute { default: json!(0) },
+    false,
+)?;
+
+// Property extension
+Doc::set_extension(
+    "upper_text",
+    ExtensionDefinition::Property {
+        getter: "lambda doc: doc.text.upper()".to_string(),
+        setter: None,
+    },
+    false,
+)?;
+
+// Method extension with kwargs
+Doc::set_extension(
+    "has_word",
+    ExtensionDefinition::Method {
+        method: "lambda doc, word: word in doc.text".to_string(),
+    },
+    false,
+)?;
+
+let doc = nlp.nlp("Hello world.")?;
+doc.set_underscore("doc_id", json!(42))?;
+assert_eq!(doc.get_underscore("doc_id")?, json!(42));
+assert_eq!(doc.get_underscore("upper_text")?, "HELLO WORLD.");
+
+let mut kwargs = std::collections::HashMap::new();
+kwargs.insert("word".to_string(), json!("world"));
+assert_eq!(doc.call_underscore("has_word", &[], &kwargs)?, json!(true));
+```
+
+**Class methods (`Doc` / `Span` / `Token`):**
+| Method | Description |
+|--------|-------------|
+| `set_extension(name, def, force)` | Register an extension |
+| `has_extension(name)` | Check if an extension is registered |
+| `remove_extension(name)` | Remove an extension (returns `ExtensionInfo`) |
+
+**Instance methods (`Doc` / `Span` / `Token`):**
+| Method | Description |
+|--------|-------------|
+| `get_underscore(name)` | Get a value from `._` |
+| `set_underscore(name, value)` | Set a value on `._` |
+| `has_underscore(name)` | Check if instance has the custom attr |
+| `call_underscore(name, args, kwargs)` | Call a method extension |
+
+### `DependencyMatcher`
+
+Match dependency subtrees using Semgrex-style operators.
+
+```rust
+use rusty::{DependencyMatcher, DependencyPatternNode, TokenPattern};
+
+let vocab = doc.vocab()?;
+let matcher = DependencyMatcher::new(&vocab, false)?;
+let pattern = vec![
+    vec![
+        DependencyPatternNode {
+            left_id: None,
+            rel_op: None,
+            right_id: "like".to_string(),
+            right_attrs: TokenPattern::new().lower("like"),
+        },
+        DependencyPatternNode {
+            left_id: Some("like".to_string()),
+            rel_op: Some(">".to_string()),
+            right_id: "subject".to_string(),
+            right_attrs: TokenPattern::new().dep("nsubj"),
+        },
+    ],
+];
+matcher.add("SUBJ", pattern)?;
+let matches = matcher.call(&doc)?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(vocab, validate)` | Create a `DependencyMatcher` |
+| `add(name, patterns)` | Add dependency patterns |
+| `call(doc)` | Find matches |
+| `len()` / `is_empty()` / `contains(name)` / `remove(name)` | Rule management |
+
+### `MorphAnalysis`
+
+Structured access to token morphology.
+
+```rust
+let token = doc.token(0)?;
+let morph = token.morph()?;
+let features = morph.to_dict()?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `to_string()` | UD FEATS string |
+| `to_dict()` | `HashMap<String, String>` |
+| `get(field)` | Values for a feature field |
+| `contains(feature_value)` | Check feature/value pair |
+| `len()` / `is_empty()` | Number of features |
+| `features()` | All feature/value pairs as strings |
 
 ## Similarity Example
 
