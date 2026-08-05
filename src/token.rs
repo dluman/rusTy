@@ -2,6 +2,7 @@ use crate::extensions::{
     py_call_underscore, py_get_underscore, py_has_extension, py_has_underscore,
     py_remove_extension, py_set_extension, py_set_underscore, ExtensionDefinition, ExtensionInfo,
 };
+use crate::lexeme::Lexeme;
 use crate::morph::MorphAnalysis;
 use crate::utils::{extract_vec_f32, with_gil};
 use crate::{Doc, SpaCyError, Span};
@@ -239,6 +240,14 @@ impl Token {
             let obj = self.obj.bind(py);
             let doc = obj.getattr("doc")?;
             Ok(Doc::new(doc.into()))
+        })
+    }
+
+    pub fn lexeme(&self) -> Result<Lexeme, SpaCyError> {
+        with_gil(|py| {
+            let obj = self.obj.bind(py);
+            let lex = obj.getattr("lex")?;
+            Ok(Lexeme::new(lex.into()))
         })
     }
 

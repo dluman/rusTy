@@ -129,7 +129,7 @@ Represents a single token.
 
 **Entities:** `ent_type_()`, `ent_iob_()`, `ent_kb_id_()`, `ent_id_()`
 
-**Lexeme:** `rank()`, `prob()`, `cluster()`
+**Lexeme:** `lexeme()`, `rank()`, `prob()`, `cluster()`
 
 **Flags:** `is_alpha()`, `is_ascii()`, `is_digit()`, `is_lower()`, `is_upper()`, `is_title()`, `is_punct()`, `is_space()`, `is_stop()`, `like_num()`, `like_email()`, `like_url()`
 
@@ -164,9 +164,90 @@ Represents a contiguous slice of tokens.
 | Method | Description |
 |--------|-------------|
 | `vocab.strings()` | Access the string store |
+| `vocab.vectors()` | Access the vocab's `Vectors` |
 | `strings.add(string)` | Add a string, get its hash |
 | `strings.get_hash(string)` | Get hash for a string |
 | `strings.get_string(hash)` | Look up string by hash |
+
+### `Vectors`
+
+Word vector table backed by numpy. Keys are 64-bit hashes from the vocab's string store.
+
+```rust
+use rusty::{Language, Vectors};
+
+let nlp = Language::load("en_core_web_sm")?;
+let vocab = nlp.vocab()?;
+let vectors = Vectors::new_table(&vocab, Some((10, 4)))?;
+vectors.add("hello", Some(&[1.0, 2.0, 3.0, 4.0]), None)?;
+let vec = vectors.get("hello")?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new_table(vocab, shape)` | Create a new vector table (`shape`: `(rows, dims)`) |
+| `add(key, vector, row)` | Add a vector; returns assigned row |
+| `get(key)` | Retrieve vector by string key |
+| `find(key, row)` | Look up row by key or key by row |
+| `contains(hash)` | Check if a key hash exists |
+| `keys()` | All key hashes in the table |
+| `len()` | Number of rows |
+| `shape()` | `(rows, dims)` |
+| `most_similar(queries, n, batch_size)` | Find `n` most similar vectors |
+| `to_bytes()` / `from_bytes(vocab, bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(vocab, path)` | Disk serialization |
+
+### `Lexeme`
+
+Represents a word type independent of context.
+
+```rust
+let token = doc.token(0)?;
+let lexeme = token.lexeme()?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `orth_()` | Canonical string form |
+| `lower_()` | Lowercased form |
+| `norm_()` | Normalized form |
+| `shape_()` | Word shape |
+| `prefix_()` / `suffix_()` | Prefix / suffix |
+| `lang_()` | Language code |
+| `is_alpha()` / `is_ascii()` / `is_digit()` / `is_lower()` / `is_upper()` / `is_title()` / `is_punct()` / `is_space()` / `is_stop()` | Boolean flags |
+| `like_num()` / `like_email()` / `like_url()` | Pattern matches |
+| `prob()` | Log probability |
+| `cluster()` | Brown cluster ID |
+| `rank()` | Frequency rank |
+| `vector()` / `vector_norm()` / `has_vector()` | Vector access |
+
+### `SpanRuler`
+
+Pipeline component for rule-based span recognition using `SpanPattern`.
+
+```rust
+use rusty::{SpanRuler, SpanPattern};
+
+let ruler = SpanRuler::new(&nlp, None, false, false, None)?;
+let patterns = vec![
+    SpanPattern::phrase("ORG", "Apple Inc."),
+    SpanPattern::tokens("ORG", vec![TokenPattern::new().orth("Apple")]),
+];
+ruler.add_patterns(&patterns)?;
+let doc = ruler.call(&nlp.nlp("Apple Inc. is hiring.")?)?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(language, phrase_matcher_attr, validate, overwrite_ents, patterns)` | Create a `SpanRuler` |
+| `add_patterns(patterns)` | Add typed `SpanPattern`s |
+| `add_patterns_raw(json)` | Add raw JSON patterns |
+| `call(doc)` | Process a `Doc` and add spans |
+| `labels()` | All span labels |
+| `spans_key()` | Default span group key |
+| `len()` / `is_empty()` | Number of patterns |
+| `to_bytes()` / `from_bytes(bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(path)` | Disk serialization |
 
 ### `Matcher`
 
@@ -296,6 +377,107 @@ for ent in doc.ents()? {
 | `len()` / `is_empty()` | Number of patterns |
 | `to_bytes()` / `from_bytes(bytes)` | Byte serialization |
 | `to_disk(path)` / `from_disk(path)` | Disk serialization |
+
+### `KnowledgeBase` & `Candidate`
+
+In-memory knowledge base for entity linking. Entities have vectors and surface-form aliases map to candidates.
+
+```rust
+use rusty::{KnowledgeBase, EntityLinker};
+
+let kb = KnowledgeBase::new(&vocab, 4)?;
+kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0])?;
+kb.add_alias("Apple", &["Q1"], &[0.9])?;
+
+let candidates = kb.get_candidates("Apple")?;
+for c in &candidates {
+    println!("{} -> {} (prob: {})", c.alias_()?, c.entity_()?, c.prior_prob()?);
+}
+```
+
+**KnowledgeBase:**
+| Method | Description |
+|--------|-------------|
+| `new(vocab, entity_vector_length)` | Create an empty `InMemoryLookupKB` |
+| `add_entity(entity, freq, vector)` | Add an entity with a vector |
+| `add_alias(alias, entities, probabilities)` | Add a surface-form alias |
+| `contains_entity(entity)` / `contains_alias(alias)` | Existence checks |
+| `get_candidates(alias)` | Get `Candidate`s for an alias |
+| `get_vector(entity)` | Retrieve entity vector |
+| `get_prior_prob(alias, entity)` | Alias→entity prior probability |
+| `entity_vector_length()` | Vector dimensionality |
+| `is_empty()` / `get_size_entities()` / `get_size_aliases()` | Size queries |
+| `get_entity_strings()` / `get_alias_strings()` | All keys |
+| `to_bytes()` / `from_bytes(vocab, bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(vocab, path)` | Disk serialization |
+
+**Candidate:**
+| Method | Description |
+|--------|-------------|
+| `entity_()` / `alias_()` | String IDs |
+| `prior_prob()` | Probability |
+| `entity_vector()` | Entity vector |
+| `entity_freq()` | Entity frequency |
+
+### `EntityLinker`
+
+Pipeline component for linking named entities to a `KnowledgeBase`. Must be initialized before running inference.
+
+```rust
+let el = EntityLinker::new(&nlp, "entity_linker", 4)?;
+el.set_kb(&kb)?;
+```
+
+| Method | Description |
+|--------|-------------|
+| `new(language, name, entity_vector_length)` | Create and add to pipeline |
+| `from_pipe(language, name)` | Retrieve existing linker |
+| `set_kb(knowledge_base)` | Attach a `KnowledgeBase` |
+| `call(doc)` | Process a `Doc` (requires init) |
+| `labels()` | Configured labels |
+| `cfg()` | Component config as JSON |
+| `name()` | Component name |
+| `to_bytes()` / `from_bytes(language, name, bytes)` | Byte serialization |
+| `to_disk(path)` / `from_disk(language, name, path)` | Disk serialization |
+
+### `Example`
+
+A training example pairing a predicted `Doc` with a reference `Doc` containing gold annotations.
+
+```rust
+use rusty::Example;
+
+let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+let example = Example::from_text_and_annotations(&nlp, "Apple is great.", annotations)?;
+
+let tags = example.get_aligned_ner()?;
+assert!(tags.iter().any(|t| t == "U-ORG"));
+```
+
+| Method | Description |
+|--------|-------------|
+| `from_dict(doc, annotations_json)` | Create from a `Doc` + JSON annotations |
+| `from_text_and_annotations(language, text, annotations_json)` | Create from text + annotations |
+| `predicted()` / `reference()` | Predicted and gold `Doc`s |
+| `text()` | Text of the example |
+| `to_dict()` | Export as spaCy annotation dict |
+| `get_aligned_ner()` | Aligned BILUO NER tags |
+| `split_sents()` | Split into one example per sentence |
+
+### `Training Utilities`
+
+Helper functions for preparing training data.
+
+```rust
+use rusty::offsets_to_biluo_tags;
+
+let doc = nlp.nlp("Apple is great.")?;
+let tags = offsets_to_biluo_tags(&doc, &[(0, 5, "ORG")])?;
+```
+
+| Function | Description |
+|----------|-------------|
+| `offsets_to_biluo_tags(doc, entities)` | Convert `(start, end, label)` offsets to BILUO tags |
 
 ### `SpanGroups` & `SpanGroup`
 

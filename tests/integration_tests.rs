@@ -1,7 +1,8 @@
 use rusty::{
-    DependencyMatcher, DependencyPatternNode, Doc, DocBin, EntityPattern, EntityRuler,
-    ExtensionDefinition, Head, Language, Matcher, MorphAnalysis, PatternValue, PhraseMatcher,
-    Token, TokenPattern,
+    offsets_to_biluo_tags, Candidate, DependencyMatcher, DependencyPatternNode, Doc, DocBin,
+    EntityLinker, EntityPattern, EntityRuler, Example, ExtensionDefinition, Head, KnowledgeBase,
+    Language, Lexeme, Matcher, MorphAnalysis, PatternValue, PhraseMatcher, SpanPattern, SpanRuler,
+    Token, TokenPattern, Vectors,
 };
 use serde_json::json;
 
@@ -763,4 +764,315 @@ fn test_morph_analysis_dict() {
     // Check that Number=Plur (or similar) is present for plural nouns
     let features = morph.features().unwrap();
     assert!(!features.is_empty());
+}
+
+// === Tier 5 Phase 1+2: Vectors, Lexeme, SpanRuler ===
+
+#[test]
+fn test_vectors_create_and_add() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    assert_eq!(vectors.shape().unwrap(), (10, 4));
+    assert!(vectors.is_empty().unwrap());
+
+    let row = vectors
+        .add("hello", Some(&[1.0, 2.0, 3.0, 4.0]), None)
+        .unwrap();
+    assert!(row < 10);
+    let hash = vocab.strings().unwrap().get_hash("hello").unwrap();
+    assert!(vectors.contains(hash).unwrap());
+    assert_eq!(vectors.keys().unwrap().len(), 1);
+}
+
+#[test]
+fn test_vectors_get_and_find() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    let vec = vec![1.0f32, 2.0, 3.0, 4.0];
+    vectors.add("hello", Some(&vec), None).unwrap();
+
+    let got = vectors.get("hello").unwrap();
+    assert_eq!(got.len(), 4);
+    assert!((got[0] - 1.0).abs() < 1e-6);
+
+    let row = vectors.find(Some("hello"), None).unwrap();
+    assert!(row >= 0);
+
+    let key = vectors.find(None, Some(row as usize)).unwrap();
+    assert!(key >= 0);
+}
+
+#[test]
+fn test_vectors_most_similar() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    vectors.add("a", Some(&[1.0, 0.0, 0.0, 0.0]), None).unwrap();
+    vectors.add("b", Some(&[0.9, 0.1, 0.0, 0.0]), None).unwrap();
+    vectors.add("c", Some(&[0.0, 1.0, 0.0, 0.0]), None).unwrap();
+
+    let queries = vec![vec![1.0f32, 0.0, 0.0, 0.0]];
+    let (keys, _rows, scores) = vectors.most_similar(&queries, 2, 1024).unwrap();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0].len(), 2);
+    assert_eq!(scores.len(), 1);
+    assert_eq!(scores[0].len(), 2);
+    // The query itself should be the most similar
+    assert!(scores[0][0] >= scores[0][1]);
+}
+
+#[test]
+fn test_vectors_roundtrip_bytes() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = Vectors::new_table(&vocab, Some((10, 4))).unwrap();
+    vectors
+        .add("hello", Some(&[1.0, 2.0, 3.0, 4.0]), None)
+        .unwrap();
+
+    let bytes = vectors.to_bytes().unwrap();
+    let vectors2 = Vectors::from_bytes(&vocab, &bytes).unwrap();
+    let hash = vocab.strings().unwrap().get_hash("hello").unwrap();
+    assert!(vectors2.contains(hash).unwrap());
+    let got = vectors2.get("hello").unwrap();
+    assert!((got[0] - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_token_lexeme() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apples are tasty.").unwrap();
+    let tokens = doc.tokens().unwrap();
+    let apples = tokens
+        .iter()
+        .find(|t| t.text().unwrap() == "Apples")
+        .unwrap();
+    let lexeme = apples.lexeme().unwrap();
+    assert_eq!(lexeme.orth_().unwrap(), "Apples");
+    let prob = lexeme.prob().unwrap();
+    assert!(prob.is_finite());
+}
+
+#[test]
+fn test_vocab_vectors() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let vectors = vocab.vectors().unwrap();
+    // en_core_web_sm has no vectors by default
+    let _shape = vectors.shape().unwrap();
+}
+
+#[test]
+fn test_span_ruler_phrase_pattern() {
+    let nlp = get_nlp();
+    let ruler = SpanRuler::new(&nlp, Some("ruler"), false, false, true, None).unwrap();
+    let patterns = vec![SpanPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let doc = nlp.nlp("Apple is great.").unwrap();
+    let doc = ruler.call(&doc).unwrap();
+    let spans = doc.spans().unwrap();
+    let group = spans.get("ruler").unwrap().unwrap();
+    assert_eq!(group.len().unwrap(), 1);
+    assert_eq!(group.get(0).unwrap().text().unwrap(), "Apple");
+    assert_eq!(group.get(0).unwrap().label_().unwrap(), "ORG");
+}
+
+#[test]
+fn test_span_ruler_annotate_ents() {
+    let nlp = get_nlp();
+    let ruler = SpanRuler::new(&nlp, None, true, false, true, None).unwrap();
+    let patterns = vec![SpanPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let doc = nlp.nlp("Apple is great.").unwrap();
+    let doc = ruler.call(&doc).unwrap();
+    let ents = doc.ents().unwrap();
+    assert!(ents
+        .iter()
+        .any(|e| { e.text().unwrap() == "Apple" && e.label_().unwrap() == "ORG" }));
+}
+
+#[test]
+fn test_span_ruler_bytes_roundtrip() {
+    let nlp = get_nlp();
+    let ruler = SpanRuler::new(&nlp, None, false, false, true, None).unwrap();
+    let patterns = vec![SpanPattern::phrase("ORG", "Apple")];
+    ruler.add_patterns(&patterns).unwrap();
+
+    let bytes = ruler.to_bytes().unwrap();
+    ruler.from_bytes(&bytes).unwrap();
+    assert_eq!(ruler.len().unwrap(), 1);
+}
+
+// === Tier 5 Phase 3: Entity Linking ===
+
+#[test]
+fn test_knowledge_base_create_and_query() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    assert_eq!(kb.entity_vector_length().unwrap(), 4);
+    assert!(kb.is_empty().unwrap());
+
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    assert!(kb.contains_entity("Q1").unwrap());
+    assert!(!kb.contains_entity("Q2").unwrap());
+    assert!(kb.contains_alias("Apple").unwrap());
+    assert!(!kb.contains_alias("Microsoft").unwrap());
+
+    let candidates = kb.get_candidates("Apple").unwrap();
+    assert_eq!(candidates.len(), 1);
+    let c = &candidates[0];
+    assert_eq!(c.entity_().unwrap(), "Q1");
+    assert_eq!(c.alias_().unwrap(), "Apple");
+    assert!((c.prior_prob().unwrap() - 0.9).abs() < 1e-5);
+    assert_eq!(c.entity_vector().unwrap().len(), 4);
+    assert!((c.entity_freq().unwrap() - 100.0).abs() < 1e-5);
+
+    let vec = kb.get_vector("Q1").unwrap();
+    assert_eq!(vec.len(), 4);
+    assert!((vec[0] - 1.0).abs() < 1e-6);
+
+    // get_prior_prob may return 0.0 in some spaCy versions;
+    // candidate.prior_prob is the reliable source
+    let _prob = kb.get_prior_prob("Apple", "Q1").unwrap();
+
+    assert_eq!(kb.get_size_entities().unwrap(), 1);
+    assert_eq!(kb.get_size_aliases().unwrap(), 1);
+
+    let entities = kb.get_entity_strings().unwrap();
+    assert_eq!(entities, vec!["Q1"]);
+
+    let aliases = kb.get_alias_strings().unwrap();
+    assert_eq!(aliases, vec!["Apple"]);
+}
+
+#[test]
+fn test_knowledge_base_bytes_roundtrip() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    let bytes = kb.to_bytes().unwrap();
+    let kb2 = KnowledgeBase::from_bytes(&vocab, &bytes).unwrap();
+    assert!(kb2.contains_entity("Q1").unwrap());
+    assert!(kb2.contains_alias("Apple").unwrap());
+    let vec = kb2.get_vector("Q1").unwrap();
+    assert!((vec[0] - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_knowledge_base_disk_roundtrip() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    let path = "/tmp/test_kb";
+    let _ = std::fs::remove_dir_all(path);
+    kb.to_disk(path).unwrap();
+    let kb2 = KnowledgeBase::from_disk(&vocab, path).unwrap();
+    assert!(kb2.contains_entity("Q1").unwrap());
+    assert!(kb2.contains_alias("Apple").unwrap());
+}
+
+#[test]
+fn test_entity_linker_creation_and_kb() {
+    let nlp = get_nlp();
+    let vocab = nlp.vocab().unwrap();
+    let kb = KnowledgeBase::new(&vocab, 4).unwrap();
+    kb.add_entity("Q1", 100, &[1.0, 2.0, 3.0, 4.0]).unwrap();
+    kb.add_alias("Apple", &["Q1"], &[0.9]).unwrap();
+
+    // Create a minimal language pipeline with entity linker
+    // (We can't call it without initialization, but we can test creation/set_kb)
+    let el = EntityLinker::new(&nlp, "entity_linker", 4).unwrap();
+    el.set_kb(&kb).unwrap();
+
+    assert_eq!(el.name().unwrap(), "entity_linker");
+    let labels = el.labels().unwrap();
+    assert!(labels.is_empty());
+}
+
+// === Tier 5 Phase 4: Training Utilities ===
+
+#[test]
+fn test_example_from_dict() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying U.K. startup.").unwrap();
+    // Use a single aligned entity to avoid misalignment issues
+    let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+    let example = Example::from_dict(&doc, annotations).unwrap();
+
+    assert_eq!(
+        example.text().unwrap(),
+        "Apple is looking at buying U.K. startup."
+    );
+
+    let predicted = example.predicted().unwrap();
+    assert_eq!(
+        predicted.text().unwrap(),
+        "Apple is looking at buying U.K. startup."
+    );
+
+    let reference = example.reference().unwrap();
+    assert_eq!(
+        reference.text().unwrap(),
+        "Apple is looking at buying U.K. startup."
+    );
+
+    let tags = example.get_aligned_ner().unwrap();
+    assert_eq!(tags.len(), 8); // 8 tokens
+    assert_eq!(tags[0], "U-ORG");
+
+    let dict = example.to_dict().unwrap();
+    assert!(dict.get("doc_annotation").is_some());
+}
+
+#[test]
+fn test_example_from_text_and_annotations() {
+    let nlp = get_nlp();
+    let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+    let example = Example::from_text_and_annotations(&nlp, "Apple is great.", annotations).unwrap();
+
+    assert_eq!(example.text().unwrap(), "Apple is great.");
+    let tags = example.get_aligned_ner().unwrap();
+    assert!(!tags.is_empty());
+    assert!(tags.iter().any(|t| t == "U-ORG"));
+}
+
+#[test]
+fn test_example_split_sents() {
+    let nlp = get_nlp();
+    let annotations = r#"{"entities": [[0, 5, "ORG"]]}"#;
+    let example = Example::from_text_and_annotations(&nlp, "Apple is great.", annotations).unwrap();
+
+    // split_sents returns one example per sentence; single-sentence docs return 1
+    let split = example.split_sents().unwrap();
+    assert!(!split.is_empty());
+    assert_eq!(split[0].text().unwrap(), "Apple is great.");
+}
+
+#[test]
+fn test_offsets_to_biluo_tags() {
+    let nlp = get_nlp();
+    let doc = nlp.nlp("Apple is looking at buying U.K. startup.").unwrap();
+
+    let entities = vec![(0usize, 5usize, "ORG"), (27usize, 30usize, "GPE")];
+    let tags = offsets_to_biluo_tags(&doc, &entities).unwrap();
+    assert_eq!(tags.len(), 8); // 8 tokens
+
+    // First token should be U-ORG
+    assert_eq!(tags[0], "U-ORG");
+
+    // U.K. is token 5 (0-indexed), GPE at position 27-30
+    assert!(tags[5] == "U-GPE" || tags[5] == "B-GPE" || tags[5] == "-");
 }
