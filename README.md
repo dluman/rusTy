@@ -3,8 +3,7 @@
 Rust bindings for the [spaCy](https://spacy.io) Python NLP library. This crate provides idiomatic, strongly-typed Rust wrappers around spaCy's core data structures and functionality, built on [pyo3](https://github.com/PyO3/pyo3) and [rust-numpy](https://github.com/PyO3/rust-numpy) for zero-copy vector access.
 
 > [!NOTE]
-> Interested in a Python library that doesn't require the GIL to speed
-> up your tokenization? Check out [interstiCy](https://www.github.com/dluman/interstiCy).
+> Interested in a Python library that speeds up your tokenization? Check out [interstiCy](https://www.github.com/dluman/interstiCy).
 
 ## Requirements
 
